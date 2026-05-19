@@ -102,6 +102,10 @@ const Signup = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 p-4">
+      <Seo
+        title="Sign Up for Ringster — Try the AI Voice Receptionist"
+        description="Create a Ringster account and launch an AI voice receptionist that books appointments and handles calls 24/7. Free credits to start."
+      />
       <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-xl shadow-2xl">
         <SignupHeader step={step} />
 
