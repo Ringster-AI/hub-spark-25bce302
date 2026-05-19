@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AuthError, AuthApiError } from "@supabase/supabase-js";
+import { Seo } from "@/components/seo/Seo";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -78,6 +79,10 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <Seo
+        title="Sign In to Ringster — AI Receptionist Dashboard"
+        description="Log in to Ringster to manage your AI voice receptionist, agents, call logs, and subscription in one place."
+      />
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Welcome to Ringster</CardTitle>
