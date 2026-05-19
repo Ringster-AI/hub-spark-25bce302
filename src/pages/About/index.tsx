@@ -1,5 +1,6 @@
 
 import React from "react";
+import { Seo } from "@/components/seo/Seo";
 import AboutNav from "./components/AboutNav";
 import AboutHero from "./components/AboutHero";
 import Intro from "./components/Intro";
