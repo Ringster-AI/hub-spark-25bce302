@@ -1,0 +1,3 @@
+CREATE POLICY "Block user inserts on usage_summary" ON public.usage_summary AS RESTRICTIVE FOR INSERT TO anon, authenticated WITH CHECK (false);
+CREATE POLICY "Block user updates on usage_summary" ON public.usage_summary AS RESTRICTIVE FOR UPDATE TO anon, authenticated USING (false) WITH CHECK (false);
+CREATE POLICY "Block user deletes on usage_summary" ON public.usage_summary AS RESTRICTIVE FOR DELETE TO anon, authenticated USING (false);
