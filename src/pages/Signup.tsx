@@ -9,6 +9,7 @@ import { SignupFormValues } from "@/types/auth";
 import { SignupHeader } from "@/components/auth/SignupHeader";
 import { SignupStepOne } from "@/components/auth/SignupStepOne";
 import { SignupStepTwo } from "@/components/auth/SignupStepTwo";
+import { Seo } from "@/components/seo/Seo";
 
 const Signup = () => {
   const [step, setStep] = useState(1);
