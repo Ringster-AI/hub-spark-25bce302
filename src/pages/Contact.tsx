@@ -50,6 +50,10 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen bg-[#F1F0FB]">
+      <Seo
+        title="Contact Ringster — Talk to the AI Receptionist Team"
+        description="Questions about Ringster's AI voice receptionist or scheduling assistant? Send us a message and our team will get back to you shortly."
+      />
       <nav className="fixed w-full top-0 z-50 bg-white/80 backdrop-blur-md">
         <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
