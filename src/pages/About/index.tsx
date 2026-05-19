@@ -14,6 +14,10 @@ import Footer from "./components/Footer";
 const About = () => {
   return (
     <div className="min-h-screen bg-[#F1F0FB] overflow-x-hidden">
+      <Seo
+        title="About Ringster — The Team Behind Your AI Receptionist"
+        description="Meet the team building Ringster, the AI voice receptionist helping solo founders and service businesses never miss a call or booking."
+      />
       <AboutNav />
       <AboutHero />
 
