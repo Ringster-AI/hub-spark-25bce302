@@ -95,27 +95,21 @@ export const TryRingsterModal = ({ trigger }: TryRingsterModalProps) => {
     try {
       const fullPhoneNumber = `${formData.countryCode}${formData.phoneNumber.replace(/\D/g, "")}`;
 
-      const response = await fetch(
-        "https://honeybee-diverse-obviously.ngrok-free.app/webhook/call-summary",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            phone_number: fullPhoneNumber,
-            company: formData.company || undefined,
-            website: formData.website || undefined,
-          }),
-        }
-      );
+      const { error } = await supabase.functions.invoke("try-ringster-call", {
+        body: {
+          name: formData.name,
+          phone_number: fullPhoneNumber,
+          company: formData.company || undefined,
+          website: formData.website || undefined,
+        },
+      });
 
-      if (!response.ok) {
-        throw new Error("Failed to initiate call");
+      if (error) {
+        throw new Error(error.message || "Failed to initiate call");
       }
 
       setSuccess(true);
+
 
       // Track with Facebook Pixel
       if (typeof window !== "undefined" && (window as any).fbq) {
