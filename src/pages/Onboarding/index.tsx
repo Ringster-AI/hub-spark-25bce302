@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useOnboardingProgress, TOTAL_STEPS } from "@/hooks/useOnboardingProgress";
 import { StepRail, OnboardingStep } from "@/components/onboarding/StepRail";
@@ -10,6 +10,7 @@ import { CalendarStep } from "./steps/CalendarStep";
 import { FirstCallStep } from "./steps/FirstCallStep";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 const STEPS: OnboardingStep[] = [
   { id: 1, title: "Meet your agent", subtitle: "Name & greeting" },
