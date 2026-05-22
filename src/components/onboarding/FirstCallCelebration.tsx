@@ -6,6 +6,7 @@ import { Sparkles, PhoneCall, Calendar, Users, Share2, Check } from "lucide-reac
 import { useFirstCallCelebration } from "@/hooks/useFirstCallCelebration";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 // Lightweight indigo + gold confetti — no extra dependency
 const ConfettiBurst = () => {
@@ -54,8 +55,11 @@ export const FirstCallCelebration = () => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (shouldCelebrate) setOpen(true);
-  }, [shouldCelebrate]);
+    if (shouldCelebrate) {
+      setOpen(true);
+      track("First_Call_Received", { duration: call?.duration ?? null });
+    }
+  }, [shouldCelebrate, call?.duration]);
 
   if (!shouldCelebrate || !call) return null;
 
@@ -79,6 +83,7 @@ export const FirstCallCelebration = () => {
 
   const handleClose = async () => {
     setOpen(false);
+    track("First_Call_Acknowledged");
     await acknowledge();
   };
 

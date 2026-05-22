@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useOnboardingProgress, TOTAL_STEPS } from "@/hooks/useOnboardingProgress";
 import { StepRail, OnboardingStep } from "@/components/onboarding/StepRail";
@@ -10,6 +10,7 @@ import { CalendarStep } from "./steps/CalendarStep";
 import { FirstCallStep } from "./steps/FirstCallStep";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 const STEPS: OnboardingStep[] = [
   { id: 1, title: "Meet your agent", subtitle: "Name & greeting" },
@@ -23,10 +24,19 @@ const Onboarding = () => {
   const { progress, isLoading, isComplete, update } = useOnboardingProgress();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const startedRef = useRef(false);
 
   useEffect(() => {
     if (progress?.current_step) setStep(progress.current_step);
   }, [progress?.current_step]);
+
+  useEffect(() => {
+    if (!progress || startedRef.current) return;
+    startedRef.current = true;
+    if (!progress.completed_at && (progress.current_step ?? 1) === 1) {
+      track("Onboarding_Started");
+    }
+  }, [progress]);
 
   const progressPct = useMemo(() => Math.round(((step - 1) / TOTAL_STEPS) * 100), [step]);
 
@@ -42,6 +52,7 @@ const Onboarding = () => {
 
   const goNext = async (patch?: Parameters<typeof update>[0]) => {
     const nextStep = Math.min(step + 1, TOTAL_STEPS);
+    track("Onboarding_Step_Completed", { step });
     await update({ ...(patch || {}), current_step: nextStep, choices: patch?.choices });
     setStep(nextStep);
   };
@@ -49,7 +60,14 @@ const Onboarding = () => {
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
   const finish = async () => {
+    track("Onboarding_Step_Completed", { step });
+    track("Onboarding_Completed");
     await update({ completed_at: new Date().toISOString(), current_step: TOTAL_STEPS });
+    navigate("/dashboard");
+  };
+
+  const handleSkip = () => {
+    track("Onboarding_Skipped", { step });
     navigate("/dashboard");
   };
 
@@ -85,7 +103,7 @@ const Onboarding = () => {
               />
             </div>
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={handleSkip}
               className="mt-6 text-xs text-white/40 hover:text-white/70 transition-colors"
             >
               Skip for now →
