@@ -5,6 +5,7 @@ import { PrimaryKPIs } from "@/components/dashboard/overview/PrimaryKPIs";
 import { QuickActions } from "@/components/dashboard/overview/QuickActions";
 import { ActivityTimeline } from "@/components/dashboard/overview/ActivityTimeline";
 import { SystemStatus } from "@/components/dashboard/overview/SystemStatus";
+import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 
 interface DashboardStats {
   totalCalls: number;
@@ -92,6 +93,8 @@ const Overview = () => {
           Here's how your agents are performing
         </p>
       </div>
+
+      <OnboardingChecklist />
 
       {/* Primary KPIs - 3 cards */}
       <PrimaryKPIs 

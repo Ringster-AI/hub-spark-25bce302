@@ -28,6 +28,7 @@ import Offer from "./pages/Offer";
 import ROICalculator from "./pages/ROICalculator";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient();
 
@@ -119,6 +120,11 @@ function App() {
             <Route path="/ebook-thank-you" element={<EbookThankYou />} />
             <Route path="/offer" element={<Offer />} />
             <Route path="/roi-calculator" element={<ROICalculator />} />
+            <Route path="/onboarding" element={
+              <PrivateRoute>
+                <Onboarding />
+              </PrivateRoute>
+            } />
             <Route path="/dashboard/*" element={
               <PrivateRoute>
                 <Dashboard />

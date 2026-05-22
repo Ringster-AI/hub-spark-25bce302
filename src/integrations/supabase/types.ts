@@ -1165,6 +1165,33 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_progress: {
+        Row: {
+          choices: Json
+          completed_at: string | null
+          created_at: string
+          current_step: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          choices?: Json
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          choices?: Json
+          completed_at?: string | null
+          created_at?: string
+          current_step?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           additional_info: string | null
@@ -1295,13 +1322,16 @@ export type Database = {
           bio: string | null
           created_at: string
           email: string | null
+          first_call_acknowledged_at: string | null
           full_name: string | null
           id: string
+          industry: string | null
           marketing_consent: boolean | null
           marketing_consent_at: string | null
           phone: string | null
           terms_accepted_at: string | null
           updated_at: string
+          use_case: string | null
           username: string | null
           website: string | null
         }
@@ -1310,13 +1340,16 @@ export type Database = {
           bio?: string | null
           created_at?: string
           email?: string | null
+          first_call_acknowledged_at?: string | null
           full_name?: string | null
           id: string
+          industry?: string | null
           marketing_consent?: boolean | null
           marketing_consent_at?: string | null
           phone?: string | null
           terms_accepted_at?: string | null
           updated_at?: string
+          use_case?: string | null
           username?: string | null
           website?: string | null
         }
@@ -1325,13 +1358,16 @@ export type Database = {
           bio?: string | null
           created_at?: string
           email?: string | null
+          first_call_acknowledged_at?: string | null
           full_name?: string | null
           id?: string
+          industry?: string | null
           marketing_consent?: boolean | null
           marketing_consent_at?: string | null
           phone?: string | null
           terms_accepted_at?: string | null
           updated_at?: string
+          use_case?: string | null
           username?: string | null
           website?: string | null
         }
