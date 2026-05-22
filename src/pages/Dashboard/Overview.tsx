@@ -6,6 +6,7 @@ import { QuickActions } from "@/components/dashboard/overview/QuickActions";
 import { ActivityTimeline } from "@/components/dashboard/overview/ActivityTimeline";
 import { SystemStatus } from "@/components/dashboard/overview/SystemStatus";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
+import { IndustryTipsCard } from "@/components/onboarding/IndustryTipsCard";
 
 interface DashboardStats {
   totalCalls: number;
@@ -95,6 +96,7 @@ const Overview = () => {
       </div>
 
       <OnboardingChecklist />
+      <IndustryTipsCard />
 
       {/* Primary KPIs - 3 cards */}
       <PrimaryKPIs 
