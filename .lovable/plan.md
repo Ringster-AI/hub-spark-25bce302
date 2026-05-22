@@ -1,90 +1,142 @@
-# Live Call Coach (Beta) Integration Plan
 
-## Architecture decision
+# Premium Onboarding for Ringster
 
-You set up `livecoach.ringster.ai` → Vercel (frontend) → Railway (backend). Inside Ringster we add a sidebar item that loads the Vercel app in an iframe, with a usage gate that enforces monthly session limits per subscription tier.
+Goal: every new user reaches one outcome — **a live AI agent answering their phone** — through a calm, confident, Midnight Indigo experience that feels like a high-end product, not a form.
 
-**Why this approach:**
-- Ships in hours, not days — no migration of the Vercel/Railway stack
-- Feels native (sidebar, no new tab)
-- Keeps Live Call Coach independently deployable while in Beta
-- When it graduates from Beta, we can migrate to a true in-repo page
+The journey has 4 acts. Each builds on the previous and shares a single visual language.
 
 ---
 
-## Tier-based access (your custom answer)
+## Act 1 — Signup (pre-account)
 
-| Plan | Monthly sessions | Behavior when exhausted |
-|---|---|---|
-| Free | 0 (locked) | Sidebar item shows lock icon, click opens upgrade modal |
-| Starter ($99) | 1 / month | After 1 session, show "Upgrade for more sessions" overlay |
-| Professional ($499) | 5 / month | After 5 sessions, same upgrade overlay |
-| Enterprise ($1,999) | Unlimited | No limit |
+Replace the current 2-step form with a refined, conversational flow.
 
-A "session" = one tracked use of Live Call Coach. We start counting when the user clicks "Start Session" inside the embedded app (or when the iframe loads, depending on what your Railway backend can signal — see open question #2 below).
+- Split-screen layout: left = form, right = live "preview panel" showing what they're building (agent avatar, sample greeting, ringing phone illustration). Updates as they type.
+- Step 1: email + password — with inline strength meter and passwordless option ("email me a magic link").
+- Step 2: company name, industry (dropdown with icons: plumbing, HVAC, electrician, clinic, agency, other), team size, primary use case (inbound / outbound / both).
+- Subtle Midnight Indigo gradient background, glassmorphism card, soft motion on step transitions.
+- Trust strip: "SOC2-ready · GDPR · 60 free credits · No credit card".
 
----
-
-## Implementation steps
-
-### 1. Database — track sessions per user per month
-New table `live_coach_sessions`:
-- `id`, `user_id`, `started_at`, `ended_at` (nullable), `session_token` (uuid for the embed handshake), `metadata` (jsonb for whatever Live Call Coach reports back)
-- RLS: users can SELECT their own; service role manages all
-- Index on `(user_id, started_at)` for fast monthly counts
-
-A `has_live_coach_access(p_user_id)` SECURITY DEFINER function returns `{ allowed: bool, sessions_used: int, limit: int|null, plan_name: text }` — used by both the sidebar (to render lock state) and the page (to gate the iframe).
-
-### 2. Edge function — `start-live-coach-session`
-- Validates JWT, looks up user's plan from `user_subscriptions` + `subscription_plans`
-- Counts sessions in the current calendar month from `live_coach_sessions`
-- If under the limit: inserts a row, returns `{ session_token, expires_at }`
-- If over: returns 403 with `{ reason: 'limit_reached', limit, used }`
-
-### 3. Sidebar — new "Live Call Coach (Beta)" item
-- Add to `ManagementMenu.tsx` (or new "Beta Features" section)
-- Use `Headphones` or `Radio` icon, with a small "BETA" pill badge
-- For Free users: show a lock icon overlay; click → upgrade modal instead of navigating
-
-### 4. New route — `/dashboard/live-coach`
-New file `src/pages/Dashboard/LiveCoach.tsx`:
-- On mount, calls `start-live-coach-session` edge function
-- If allowed: renders `<iframe src="https://livecoach.ringster.ai?token={session_token}" allow="microphone; camera" />` full-height
-- If blocked: renders an upgrade card showing usage (e.g. "5 of 5 sessions used this month") with "Upgrade Plan" CTA → `/dashboard/subscription`
-- Header shows "X of Y sessions used this month" (or "Unlimited" for Enterprise)
-
-Register the route in `src/pages/Dashboard.tsx`.
-
-### 5. Subdomain setup (you handle)
-- In Vercel: add `livecoach.ringster.ai` as a custom domain
-- In your DNS (Lovable-managed for ringster.ai): add a CNAME `livecoach` → Vercel's target
-
-### 6. Auth handshake (deferred per your answer)
-For Beta v1 we just pass the `session_token` as a query param. The Vercel/Railway side can later validate it by calling a Supabase edge function `verify-live-coach-session` that checks the token exists and isn't expired. This is enough to prevent random people from loading the iframe URL directly.
+Industry + use case answers feed personalization downstream.
 
 ---
 
-## Files to create / edit
+## Act 2 — Post-signup Launch Wizard
 
-**Create:**
-- `supabase/migrations/<timestamp>_live_coach_sessions.sql` — table, RLS, `has_live_coach_access` function
-- `supabase/functions/start-live-coach-session/index.ts`
-- `src/pages/Dashboard/LiveCoach.tsx`
-- `src/hooks/useLiveCoachAccess.ts` — wraps the access check for sidebar + page
+Full-screen 5-step wizard at `/onboarding` (gated until complete, dismissable to dashboard with progress saved).
 
-**Edit:**
-- `src/pages/Dashboard.tsx` — add route
-- `src/components/dashboard/sidebar/ManagementMenu.tsx` — add menu item with BETA badge + lock state
+```text
+[1] Meet your agent  → [2] Voice & tone  → [3] Phone number  → [4] Calendar  → [5] First test call
+```
+
+1. **Meet your agent** — Pre-named agent based on industry ("Sarah for HVAC"), editable. Shows generated greeting script. One-click "Looks good".
+2. **Voice & tone** — 3 curated voice cards (Warm / Professional / Friendly) with play buttons. Tone slider (Formal ↔ Casual).
+3. **Phone number** — One-click provision via existing `manage-twilio-number`. Shows the number animating in. Option to forward an existing line later.
+4. **Calendar** — Google / Microsoft / Cal.com / Skip. Uses existing connectors. Skipping is fine — surfaced again later.
+5. **First test call** — "Call your agent now" with their new number displayed large + "Call me instead" button (uses existing demo-call webhook to ring the user's phone immediately).
+
+Design: left rail with vertical stepper, large breathing room, micro-animations between steps, gold-tinted "Step complete" checks against Midnight Indigo.
+
+Persisted in a new `onboarding_progress` table (user_id, step, completed_at, choices jsonb) so users can resume across devices.
 
 ---
 
-## Open questions to resolve before I build
+## Act 3 — First-time Dashboard Experience
 
-1. **Sidebar placement**: under "Management" alongside Calendar/Recordings/Analytics, or a new "Beta Features" group at the bottom? I'd lean toward Management for discoverability.
-2. **Session counting trigger**: when should a session "count"?
-   - **Option A**: As soon as the user opens `/dashboard/live-coach` and the iframe loads (simple, slightly unfair if they immediately leave)
-   - **Option B**: When the Live Call Coach app explicitly POSTs back to a Supabase webhook saying "session started" — requires a small change on your Railway backend, but is fairest
-3. **Upgrade modal copy**: anything specific you want to say on the lock screen, or use a generic "Live Call Coach is available on Starter and above"?
-4. **Microphone permission**: confirm the embedded app needs mic access via `getUserMedia`? If yes the iframe needs `allow="microphone"` (already in the plan).
+The Overview page detects `!hasCompletedOnboarding` and switches to "first-run mode":
 
-Pick answers for #1 and #2 and I'll execute.
+- **Hero checklist card** at top: 5 items with progress ring (e.g. "3 of 5 — keep going"). Each item links back into the wizard step.
+- **Empty-state KPI cards** show illustrated placeholders ("Your first call will appear here") instead of zeros.
+- **Activity timeline** shows a friendly "Waiting for your first call…" pulse, with a "Make a test call" CTA.
+- **Spotlight tour** (one-time, dismissable) using a lightweight custom tooltip system — 4 stops max: Agents, Recordings, Calendar, Subscription. No third-party tour lib.
+
+Once all checklist items are done, the card collapses into a small "Setup complete ✓" banner that fades away after 24h.
+
+---
+
+## Act 4 — First Call Activation Moment
+
+When the very first inbound or test call lands:
+
+- Real-time toast + full-screen celebration modal: "Your agent just took its first call." Confetti is subtle (Midnight Indigo + a single gold burst).
+- Shows the recording, transcript snippet, and a "Share this moment" button (copies a sharable summary).
+- Prompts the next best action based on missing pieces: connect calendar, invite a teammate, or upgrade for more minutes.
+
+Tracked via a new `first_call_acknowledged_at` on profiles to fire only once.
+
+---
+
+## Personalization (level 4)
+
+Industry + use case captured at signup drive:
+- Agent name + greeting template
+- Suggested voice
+- Tone defaults
+- Sample script and FAQ pre-fills
+- Industry-specific tips card on dashboard during onboarding
+- Email follow-ups (via existing MailerLite integration) segmented by industry
+
+No fully bespoke per-user copywriting — curated templates per industry vertical.
+
+---
+
+## Visual System (Midnight Indigo)
+
+- Background `#0a0a1a` → `#141432` gradients
+- Surface `#1e1e5a` glass cards with 1px `#4f46e5/20` border
+- Accent `#4f46e5`, success in soft mint, single gold highlight reserved for "step complete" and celebration moment
+- Typography: keep current stack, increase tracking on H1s for editorial feel
+- Motion: 250ms ease-out transitions, no bounce; respect `prefers-reduced-motion`
+
+---
+
+## Technical Section
+
+### New routes / files
+- `src/pages/Onboarding/index.tsx` — wizard shell
+- `src/pages/Onboarding/steps/{MeetAgent,Voice,Phone,Calendar,FirstCall}.tsx`
+- `src/components/onboarding/{StepRail,StepCard,OnboardingChecklist,FirstCallCelebration}.tsx`
+- `src/hooks/useOnboardingProgress.ts`
+- Update `App.tsx` to add `/onboarding` route inside `PrivateRoute` and redirect new users there after signup
+- Update `Signup.tsx` to a 2-column layout and add industry/use-case fields
+- Update `Overview.tsx` to render `OnboardingChecklist` when incomplete
+
+### Data model (Supabase migration)
+```sql
+create table public.onboarding_progress (
+  user_id uuid primary key references auth.users on delete cascade,
+  current_step int not null default 1,
+  completed_at timestamptz,
+  choices jsonb not null default '{}'::jsonb,
+  updated_at timestamptz default now()
+);
+-- RLS: users select/update own row; insert via SECURITY DEFINER trigger on auth.users
+```
+Add `industry text`, `use_case text`, `first_call_acknowledged_at timestamptz` to `profiles`.
+
+### Reused services
+- `manage-twilio-number` (Netlify) for phone provisioning
+- `manage-vapi-assistant` for agent creation with pre-filled greeting
+- `connect-google` / `connect-microsoft` / Cal.com flows
+- `forward-demo-request` for "Call me instead"
+- Existing `useCookieConsent` and analytics events for funnel tracking
+
+### Analytics
+Fire Meta Pixel + GTM events (consent-gated): `Onboarding_Started`, `Onboarding_Step_N_Completed`, `Onboarding_Completed`, `First_Call_Received`.
+
+### Out of scope for v1
+- A/B testing framework
+- Live chat / Intercom handoff
+- Video walkthroughs
+
+---
+
+## Build order
+
+1. Migration + `useOnboardingProgress` hook
+2. Wizard shell + 5 steps wired to existing services
+3. Signup refresh (split-screen + industry/use-case)
+4. Dashboard first-run checklist + empty states
+5. First-call celebration moment
+6. Personalization templates per industry
+7. Analytics events + polish pass
