@@ -24,10 +24,19 @@ const Onboarding = () => {
   const { progress, isLoading, isComplete, update } = useOnboardingProgress();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const startedRef = useRef(false);
 
   useEffect(() => {
     if (progress?.current_step) setStep(progress.current_step);
   }, [progress?.current_step]);
+
+  useEffect(() => {
+    if (!progress || startedRef.current) return;
+    startedRef.current = true;
+    if (!progress.completed_at && (progress.current_step ?? 1) === 1) {
+      track("Onboarding_Started");
+    }
+  }, [progress]);
 
   const progressPct = useMemo(() => Math.round(((step - 1) / TOTAL_STEPS) * 100), [step]);
 
@@ -43,6 +52,7 @@ const Onboarding = () => {
 
   const goNext = async (patch?: Parameters<typeof update>[0]) => {
     const nextStep = Math.min(step + 1, TOTAL_STEPS);
+    track("Onboarding_Step_Completed", { step });
     await update({ ...(patch || {}), current_step: nextStep, choices: patch?.choices });
     setStep(nextStep);
   };
@@ -50,7 +60,14 @@ const Onboarding = () => {
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
   const finish = async () => {
+    track("Onboarding_Step_Completed", { step });
+    track("Onboarding_Completed");
     await update({ completed_at: new Date().toISOString(), current_step: TOTAL_STEPS });
+    navigate("/dashboard");
+  };
+
+  const handleSkip = () => {
+    track("Onboarding_Skipped", { step });
     navigate("/dashboard");
   };
 
