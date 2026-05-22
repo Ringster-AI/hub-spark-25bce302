@@ -19,6 +19,7 @@ import Profile from "./Dashboard/Profile";
 import Calendar from "./Dashboard/Calendar";
 import LiveCoach from "./Dashboard/LiveCoach";
 import { FeedbackDialog } from "@/components/dashboard/FeedbackDialog";
+import { FirstCallCelebration } from "@/components/onboarding/FirstCallCelebration";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Menu } from "lucide-react";
@@ -183,6 +184,7 @@ const Dashboard = () => {
           </div>
         </div>
         <FeedbackDialog />
+        <FirstCallCelebration />
       </div>
     </SidebarProvider>
   );
