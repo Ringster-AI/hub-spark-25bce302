@@ -6,6 +6,7 @@ import { Sparkles, PhoneCall, Calendar, Users, Share2, Check } from "lucide-reac
 import { useFirstCallCelebration } from "@/hooks/useFirstCallCelebration";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 // Lightweight indigo + gold confetti — no extra dependency
 const ConfettiBurst = () => {
