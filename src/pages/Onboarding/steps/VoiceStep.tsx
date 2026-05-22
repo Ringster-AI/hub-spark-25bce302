@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { OnboardingChoices } from "@/hooks/useOnboardingProgress";
 import { ArrowLeft, ArrowRight, Volume2 } from "lucide-react";
+import { industryTemplate } from "@/lib/industryDefaults";
 
 interface Props {
   onNext: (patch: { choices: OnboardingChoices }) => Promise<void>;
@@ -19,8 +20,9 @@ const VOICES = [
 ] as const;
 
 export const VoiceStep = ({ onNext, onBack, initial }: Props) => {
-  const [voice, setVoice] = useState<OnboardingChoices["voice"]>(initial?.voice || "warm");
-  const [tone, setTone] = useState<number>(initial?.tone ?? 50);
+  const tpl = industryTemplate(initial?.industry);
+  const [voice, setVoice] = useState<OnboardingChoices["voice"]>(initial?.voice || tpl.voice);
+  const [tone, setTone] = useState<number>(initial?.tone ?? tpl.tone);
   const [saving, setSaving] = useState(false);
 
   const handleNext = async () => {
