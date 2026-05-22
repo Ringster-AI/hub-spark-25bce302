@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Phone, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
 
 const countryCodes = [
   { code: "+1", country: "US", flag: "🇺🇸" },
