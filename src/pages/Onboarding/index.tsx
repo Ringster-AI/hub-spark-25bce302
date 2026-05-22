@@ -103,7 +103,7 @@ const Onboarding = () => {
               />
             </div>
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={handleSkip}
               className="mt-6 text-xs text-white/40 hover:text-white/70 transition-colors"
             >
               Skip for now →
