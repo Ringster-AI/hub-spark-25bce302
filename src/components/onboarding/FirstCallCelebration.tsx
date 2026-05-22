@@ -83,6 +83,7 @@ export const FirstCallCelebration = () => {
 
   const handleClose = async () => {
     setOpen(false);
+    track("First_Call_Acknowledged");
     await acknowledge();
   };
 
