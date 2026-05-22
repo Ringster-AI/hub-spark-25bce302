@@ -29,5 +29,9 @@ allow_public_network_access = true
 [process-campaigns]
 verify_jwt = false
 
+[try-ringster-call]
+verify_jwt = false
+
+
 [shared_schema]
 migrations_dir = "migrations"
