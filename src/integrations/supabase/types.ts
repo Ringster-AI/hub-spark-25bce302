@@ -1537,6 +1537,27 @@ export type Database = {
           },
         ]
       }
+      try_ringster_call_rate_limits: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string | null
+          phone_number: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          phone_number?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          phone_number?: string | null
+        }
+        Relationships: []
+      }
       usage_summary: {
         Row: {
           created_at: string | null

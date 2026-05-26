@@ -1,4 +1,9 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+const IP_LIMIT_PER_HOUR = 5;
+const PHONE_LIMIT_PER_HOUR = 2;
+const WINDOW_MS = 60 * 60 * 1000;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -25,10 +30,79 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Phone format validation (E.164-ish): + followed by 8-15 digits
+    const cleanPhone = phone_number.trim();
+    if (!/^\+[1-9]\d{7,14}$/.test(cleanPhone)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid phone number format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    if (name.length > 100 || (company && company.length > 200) || (website && website.length > 500)) {
+      return new Response(
+        JSON.stringify({ error: 'Input exceeds maximum length' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Derive caller IP
+    const ip =
+      req.headers.get('cf-connecting-ip') ||
+      req.headers.get('x-real-ip') ||
+      (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
+      'unknown';
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
+
+    const sinceIso = new Date(Date.now() - WINDOW_MS).toISOString();
+
+    // Check IP-based limit
+    const { count: ipCount, error: ipErr } = await supabase
+      .from('try_ringster_call_rate_limits')
+      .select('id', { count: 'exact', head: true })
+      .eq('ip_address', ip)
+      .gte('created_at', sinceIso);
+
+    if (ipErr) console.error('IP rate-limit query error', ipErr);
+
+    if ((ipCount ?? 0) >= IP_LIMIT_PER_HOUR) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Check phone-based limit
+    const { count: phoneCount, error: phoneErr } = await supabase
+      .from('try_ringster_call_rate_limits')
+      .select('id', { count: 'exact', head: true })
+      .eq('phone_number', cleanPhone)
+      .gte('created_at', sinceIso);
+
+    if (phoneErr) console.error('Phone rate-limit query error', phoneErr);
+
+    if ((phoneCount ?? 0) >= PHONE_LIMIT_PER_HOUR) {
+      return new Response(
+        JSON.stringify({ error: 'This number has already been called recently. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Log the attempt BEFORE making the call (fail-closed)
+    const { error: insertErr } = await supabase
+      .from('try_ringster_call_rate_limits')
+      .insert({ ip_address: ip, phone_number: cleanPhone });
+
+    if (insertErr) console.error('Rate-limit insert error', insertErr);
+
     const upstream = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, phone_number, company, website }),
+      body: JSON.stringify({ name, phone_number: cleanPhone, company, website }),
     });
 
     const text = await upstream.text();
