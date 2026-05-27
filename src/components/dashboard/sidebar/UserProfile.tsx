@@ -1,7 +1,8 @@
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { Shield } from "lucide-react";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 interface UserProfileProps {
   profile: {
@@ -14,11 +15,12 @@ interface UserProfileProps {
 
 export const UserProfile = ({ profile }: UserProfileProps) => {
   const navigate = useNavigate();
+  const { data: isAdmin } = useSuperAdmin();
 
   return (
-    <div className="px-4 mb-6">
+    <div className="px-4 mb-6 space-y-2">
       <Card className="shadow-md hover:shadow-lg transition-shadow">
-        <button 
+        <button
           onClick={() => navigate('/dashboard/profile')}
           className="w-full flex items-center gap-3 p-4 rounded-lg hover:bg-accent/50 transition-colors"
         >
@@ -38,6 +40,15 @@ export const UserProfile = ({ profile }: UserProfileProps) => {
           </div>
         </button>
       </Card>
+      {isAdmin && (
+        <button
+          onClick={() => navigate('/admin')}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+        >
+          <Shield className="h-3.5 w-3.5" />
+          Admin tools
+        </button>
+      )}
     </div>
   );
 };
