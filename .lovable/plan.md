@@ -1,142 +1,77 @@
+## Goal
+Build a dedicated admin area where users with a new `super_admin` role can view, edit, toggle, delete, and re-sync any agent across all users (including its Vapi/Twilio resources).
 
-# Premium Onboarding for Ringster
+## 1. Database
 
-Goal: every new user reaches one outcome — **a live AI agent answering their phone** — through a calm, confident, Midnight Indigo experience that feels like a high-end product, not a form.
+Add a new role and supporting access function (the existing `app_role` is a `text` column on `user_roles`, and `has_role(uuid, text)` already exists, so this is additive).
 
-The journey has 4 acts. Each builds on the previous and shares a single visual language.
+- Migration: insert `super_admin` as a valid role value and add a convenience function `is_super_admin(uuid)` (SECURITY DEFINER, `search_path = public`) that wraps `has_role(uid, 'super_admin')`.
+- Add RLS policies on `agent_configs` granting `super_admin` full SELECT / UPDATE / DELETE across all rows (in addition to existing owner policies).
+- Add matching admin-override RLS policies on related tables the admin tool reads/edits: `call_logs` (SELECT), `call_recordings` (SELECT), `calendar_tools` (ALL), `profiles` (SELECT, to show owner name/email).
+- Manual role grants happen via SQL — no self-promotion UI.
 
----
+## 2. Routing & access control
 
-## Act 1 — Signup (pre-account)
+- New route tree under `/admin` with its own layout (`src/pages/Admin/AdminLayout.tsx`) — separate from `/dashboard`. Minimal sidebar with one entry today ("Agents") so we can grow the section later.
+- New `useSuperAdmin()` hook calling `is_super_admin(auth.uid())`; redirect non-admins to `/dashboard`.
+- Top-right link to `/admin` appears in the existing dashboard `UserProfile` menu only when `useSuperAdmin()` returns true.
 
-Replace the current 2-step form with a refined, conversational flow.
+## 3. Admin Agents list — `/admin/agents`
 
-- Split-screen layout: left = form, right = live "preview panel" showing what they're building (agent avatar, sample greeting, ringing phone illustration). Updates as they type.
-- Step 1: email + password — with inline strength meter and passwordless option ("email me a magic link").
-- Step 2: company name, industry (dropdown with icons: plumbing, HVAC, electrician, clinic, agency, other), team size, primary use case (inbound / outbound / both).
-- Subtle Midnight Indigo gradient background, glassmorphism card, soft motion on step transitions.
-- Trust strip: "SOC2-ready · GDPR · 60 free credits · No credit card".
+- Server-side query: all `agent_configs` joined with `profiles` (owner email/full_name) and aggregated usage from `call_logs` (count + total minutes last 30d).
+- Table columns: Name, Owner (email), Type (inbound/outbound), Status, Phone, Vapi assistant ID, Twilio SID, Minutes used, Last call, Actions.
+- Filters: search (name/owner/phone), status, agent_type, "has Vapi", "has Twilio".
+- Row actions: View, Edit, Toggle status, Delete, Re-sync Vapi.
+- Bulk actions: toggle status, delete.
 
-Industry + use case answers feed personalization downstream.
+## 4. Admin Agent detail — `/admin/agents/:id`
 
----
+Reuses the existing `AgentForm` (`src/components/agents/AgentForm.tsx`) so admins edit the same fields owners do — name, greeting/goodbye, voice, transfer directory, advanced config, calendar booking. Saves go through the standard supabase update (allowed by the new admin RLS policy).
 
-## Act 2 — Post-signup Launch Wizard
+Side panel: Vapi/Twilio resource management
 
-Full-screen 5-step wizard at `/onboarding` (gated until complete, dismissable to dashboard with progress saved).
+- **Vapi assistant**: show `vapi_assistant_id`, last sync time. Buttons: "Re-sync with Vapi" (calls existing `VapiAssistantUpdateService.syncAgentWithVapi`), "View on Vapi" (deep link).
+- **Twilio number**: show `phone_number`, `twilio_sid`. Buttons: "Re-provision number" (calls existing `manage-twilio-number` Netlify function), "Release number".
+- **Transfer tool**: show current `transfer_directory` JSON and the resulting Vapi tool destinations (read-only preview rendered via the existing transfer-tool builder logic).
+- **Calendar tool**: show linked `calendar_tools` row, allow enable/disable.
+- **Recent calls**: last 20 `call_logs` for this agent with status, duration, timestamps.
+- **Audit footer**: created_at, updated_at, owner profile link.
+
+## 5. Netlify function hardening
+
+For any Netlify function reachable from the admin tool (`manage-twilio-number`, `manage-vapi-assistant`), add a check: if the caller's JWT user is `super_admin`, allow operating on agents owned by a different user; otherwise keep current owner-only check. No new function is required — they already exist.
+
+## 6. UX details
+
+- Reuse shadcn `Table`, `DropdownMenu`, `Dialog`, `Tabs`. Match the calm premium dashboard look — no new design tokens.
+- Confirm dialogs for destructive actions (delete agent, release number).
+- Toasts via existing `useToast`.
+- Empty state, loading skeletons, error states consistent with the rest of the app.
+
+## Technical notes (developer reference)
 
 ```text
-[1] Meet your agent  → [2] Voice & tone  → [3] Phone number  → [4] Calendar  → [5] First test call
+src/
+  pages/Admin/
+    AdminLayout.tsx
+    Agents/
+      index.tsx              # list
+      [id].tsx               # detail
+  hooks/useSuperAdmin.ts
+  components/admin/
+    AdminSidebar.tsx
+    AgentsTable.tsx
+    AgentResourcesPanel.tsx
+    AgentRecentCalls.tsx
 ```
 
-1. **Meet your agent** — Pre-named agent based on industry ("Sarah for HVAC"), editable. Shows generated greeting script. One-click "Looks good".
-2. **Voice & tone** — 3 curated voice cards (Warm / Professional / Friendly) with play buttons. Tone slider (Formal ↔ Casual).
-3. **Phone number** — One-click provision via existing `manage-twilio-number`. Shows the number animating in. Option to forward an existing line later.
-4. **Calendar** — Google / Microsoft / Cal.com / Skip. Uses existing connectors. Skipping is fine — surfaced again later.
-5. **First test call** — "Call your agent now" with their new number displayed large + "Call me instead" button (uses existing demo-call webhook to ring the user's phone immediately).
+- Add `/admin/*` routes in `src/App.tsx` behind `useSuperAdmin` guard.
+- All admin queries pass through Supabase client (RLS enforces access). No service-role usage in the browser.
+- Re-sync / re-provision actions call existing Netlify functions via `getNetlifyFunctionsUrl` (per the cross-environment routing rule).
 
-Design: left rail with vertical stepper, large breathing room, micro-animations between steps, gold-tinted "Step complete" checks against Midnight Indigo.
+## Out of scope (for this iteration)
 
-Persisted in a new `onboarding_progress` table (user_id, step, completed_at, choices jsonb) so users can resume across devices.
-
----
-
-## Act 3 — First-time Dashboard Experience
-
-The Overview page detects `!hasCompletedOnboarding` and switches to "first-run mode":
-
-- **Hero checklist card** at top: 5 items with progress ring (e.g. "3 of 5 — keep going"). Each item links back into the wizard step.
-- **Empty-state KPI cards** show illustrated placeholders ("Your first call will appear here") instead of zeros.
-- **Activity timeline** shows a friendly "Waiting for your first call…" pulse, with a "Make a test call" CTA.
-- **Spotlight tour** (one-time, dismissable) using a lightweight custom tooltip system — 4 stops max: Agents, Recordings, Calendar, Subscription. No third-party tour lib.
-
-Once all checklist items are done, the card collapses into a small "Setup complete ✓" banner that fades away after 24h.
-
----
-
-## Act 4 — First Call Activation Moment
-
-When the very first inbound or test call lands:
-
-- Real-time toast + full-screen celebration modal: "Your agent just took its first call." Confetti is subtle (Midnight Indigo + a single gold burst).
-- Shows the recording, transcript snippet, and a "Share this moment" button (copies a sharable summary).
-- Prompts the next best action based on missing pieces: connect calendar, invite a teammate, or upgrade for more minutes.
-
-Tracked via a new `first_call_acknowledged_at` on profiles to fire only once.
-
----
-
-## Personalization (level 4)
-
-Industry + use case captured at signup drive:
-- Agent name + greeting template
-- Suggested voice
-- Tone defaults
-- Sample script and FAQ pre-fills
-- Industry-specific tips card on dashboard during onboarding
-- Email follow-ups (via existing MailerLite integration) segmented by industry
-
-No fully bespoke per-user copywriting — curated templates per industry vertical.
-
----
-
-## Visual System (Midnight Indigo)
-
-- Background `#0a0a1a` → `#141432` gradients
-- Surface `#1e1e5a` glass cards with 1px `#4f46e5/20` border
-- Accent `#4f46e5`, success in soft mint, single gold highlight reserved for "step complete" and celebration moment
-- Typography: keep current stack, increase tracking on H1s for editorial feel
-- Motion: 250ms ease-out transitions, no bounce; respect `prefers-reduced-motion`
-
----
-
-## Technical Section
-
-### New routes / files
-- `src/pages/Onboarding/index.tsx` — wizard shell
-- `src/pages/Onboarding/steps/{MeetAgent,Voice,Phone,Calendar,FirstCall}.tsx`
-- `src/components/onboarding/{StepRail,StepCard,OnboardingChecklist,FirstCallCelebration}.tsx`
-- `src/hooks/useOnboardingProgress.ts`
-- Update `App.tsx` to add `/onboarding` route inside `PrivateRoute` and redirect new users there after signup
-- Update `Signup.tsx` to a 2-column layout and add industry/use-case fields
-- Update `Overview.tsx` to render `OnboardingChecklist` when incomplete
-
-### Data model (Supabase migration)
-```sql
-create table public.onboarding_progress (
-  user_id uuid primary key references auth.users on delete cascade,
-  current_step int not null default 1,
-  completed_at timestamptz,
-  choices jsonb not null default '{}'::jsonb,
-  updated_at timestamptz default now()
-);
--- RLS: users select/update own row; insert via SECURITY DEFINER trigger on auth.users
-```
-Add `industry text`, `use_case text`, `first_call_acknowledged_at timestamptz` to `profiles`.
-
-### Reused services
-- `manage-twilio-number` (Netlify) for phone provisioning
-- `manage-vapi-assistant` for agent creation with pre-filled greeting
-- `connect-google` / `connect-microsoft` / Cal.com flows
-- `forward-demo-request` for "Call me instead"
-- Existing `useCookieConsent` and analytics events for funnel tracking
-
-### Analytics
-Fire Meta Pixel + GTM events (consent-gated): `Onboarding_Started`, `Onboarding_Step_N_Completed`, `Onboarding_Completed`, `First_Call_Received`.
-
-### Out of scope for v1
-- A/B testing framework
-- Live chat / Intercom handoff
-- Video walkthroughs
-
----
-
-## Build order
-
-1. Migration + `useOnboardingProgress` hook
-2. Wizard shell + 5 steps wired to existing services
-3. Signup refresh (split-screen + industry/use-case)
-4. Dashboard first-run checklist + empty states
-5. First-call celebration moment
-6. Personalization templates per industry
-7. Analytics events + polish pass
+- Promoting/demoting roles from the UI (done manually in SQL).
+- Editing owner of an agent.
+- Cross-user usage analytics dashboards (just per-agent recent calls).
+- A general "all users" admin view (only agents this round).
