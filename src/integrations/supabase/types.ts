@@ -1808,6 +1808,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       migrate_google_integrations: { Args: never; Returns: undefined }
       process_campaign_contacts: { Args: never; Returns: undefined }
       reset_monthly_credits: { Args: { p_user_id: string }; Returns: boolean }

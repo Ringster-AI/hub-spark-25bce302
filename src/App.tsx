@@ -29,6 +29,9 @@ import ROICalculator from "./pages/ROICalculator";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import Onboarding from "./pages/Onboarding";
+import AdminLayout from "./pages/Admin/AdminLayout";
+import AdminAgentsList from "./pages/Admin/Agents/AdminAgentsList";
+import AdminAgentDetail from "./pages/Admin/Agents/AdminAgentDetail";
 
 const queryClient = new QueryClient();
 
@@ -130,6 +133,15 @@ function App() {
                 <Dashboard />
               </PrivateRoute>
             } />
+            <Route path="/admin" element={
+              <PrivateRoute>
+                <AdminLayout />
+              </PrivateRoute>
+            }>
+              <Route index element={<Navigate to="/admin/agents" replace />} />
+              <Route path="agents" element={<AdminAgentsList />} />
+              <Route path="agents/:id" element={<AdminAgentDetail />} />
+            </Route>
           </Routes>
           <CookieConsentBanner />
         </Router>
