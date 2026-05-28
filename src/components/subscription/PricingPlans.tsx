@@ -9,7 +9,7 @@ import { PricingPlan } from "./types";
 
 export const PricingPlans = () => {
   const { toast } = useToast();
-  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
+  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('year');
 
   useEffect(() => {
     // Track pricing page view
