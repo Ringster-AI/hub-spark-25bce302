@@ -1,9 +1,8 @@
-
 import { SubscriptionContent } from "./subscription/SubscriptionContent";
 
 const Subscription = () => {
   return (
-    <div className="h-full w-full overflow-auto">
+    <div className="w-full">
       <SubscriptionContent />
     </div>
   );
