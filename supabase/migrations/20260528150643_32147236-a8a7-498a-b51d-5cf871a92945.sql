@@ -1,0 +1,1 @@
+UPDATE public.subscription_plans SET billing_interval = 'month' WHERE id = '7277ece9-90ef-4557-8cb3-70f9bbf6d6fd';
