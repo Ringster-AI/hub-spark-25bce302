@@ -13,7 +13,7 @@ export const PricingPlans = () => {
 
   useEffect(() => {
     // Track pricing page view
-    if (typeof (window as any).fbq === 'function') {
+  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('year');
       (window as any).fbq('track', 'ViewContent', {
         content_name: 'Pricing Plans',
         content_category: 'Subscription'
