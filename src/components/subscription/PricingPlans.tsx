@@ -9,11 +9,11 @@ import { PricingPlan } from "./types";
 
 export const PricingPlans = () => {
   const { toast } = useToast();
-  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
+  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('year');
 
   useEffect(() => {
     // Track pricing page view
-  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('year');
+    if (typeof (window as any).fbq === 'function') {
       (window as any).fbq('track', 'ViewContent', {
         content_name: 'Pricing Plans',
         content_category: 'Subscription'
