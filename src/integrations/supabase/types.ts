@@ -1659,11 +1659,13 @@ export type Database = {
           can_listen: boolean
           can_transfer: boolean
           created_at: string
+          display_name: string | null
           email: string
           id: string
           invited_at: string
           member_user_id: string | null
           owner_user_id: string
+          phone_number: string | null
           receives_notifications: boolean
           revoked_at: string | null
           role: string
@@ -1675,11 +1677,13 @@ export type Database = {
           can_listen?: boolean
           can_transfer?: boolean
           created_at?: string
+          display_name?: string | null
           email: string
           id?: string
           invited_at?: string
           member_user_id?: string | null
           owner_user_id: string
+          phone_number?: string | null
           receives_notifications?: boolean
           revoked_at?: string | null
           role?: string
@@ -1691,11 +1695,13 @@ export type Database = {
           can_listen?: boolean
           can_transfer?: boolean
           created_at?: string
+          display_name?: string | null
           email?: string
           id?: string
           invited_at?: string
           member_user_id?: string | null
           owner_user_id?: string
+          phone_number?: string | null
           receives_notifications?: boolean
           revoked_at?: string | null
           role?: string
