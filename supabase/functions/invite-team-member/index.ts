@@ -30,12 +30,21 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const email = String(body.email ?? "").trim().toLowerCase();
     const role = String(body.role ?? "viewer");
+    const display_name = body.display_name ? String(body.display_name).trim().slice(0, 80) : null;
+    const phone_raw = body.phone_number ? String(body.phone_number).trim() : "";
+    const phone_number = phone_raw
+      ? (phone_raw.startsWith("+") ? phone_raw : `+${phone_raw.replace(/\D/g, "")}`)
+      : null;
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return new Response(JSON.stringify({ error: "Invalid email" }), { status: 400, headers: jsonHeaders });
     }
     if (!VALID_ROLES.includes(role as any)) {
       return new Response(JSON.stringify({ error: "Invalid role" }), { status: 400, headers: jsonHeaders });
     }
+    if (phone_number && !/^\+[1-9]\d{6,14}$/.test(phone_number)) {
+      return new Response(JSON.stringify({ error: "Phone number must be E.164 (e.g. +16475235895)" }), { status: 400, headers: jsonHeaders });
+    }
+
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
