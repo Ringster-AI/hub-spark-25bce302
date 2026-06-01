@@ -43,7 +43,88 @@ Deno.serve(async (req) => {
   const message = payload?.message ?? payload;
   const type = message?.type;
 
-  // Vapi fires many event types — we only act on the final report
+  // Helpers shared across event types ---------------------------------------
+  const call = message?.call ?? {};
+  const assistantId: string | undefined = call.assistantId ?? message?.assistantId;
+  const vapiCallId: string | undefined = call.id ?? message?.callId;
+
+  async function resolveOwner(): Promise<{ userId: string | null; agentId: string | null }> {
+    const metadata = call.metadata ?? message.metadata ?? {};
+    let userId: string | null = metadata.user_id ?? metadata.userId ?? null;
+    let agentId: string | null = metadata.agent_id ?? metadata.agentId ?? null;
+    if ((!userId || !agentId) && assistantId) {
+      const { data: agent } = await admin
+        .from("agent_configs")
+        .select("id, user_id")
+        .eq("vapi_assistant_id", assistantId)
+        .maybeSingle();
+      if (agent) {
+        userId = userId ?? agent.user_id;
+        agentId = agentId ?? agent.id;
+      }
+    }
+    return { userId, agentId };
+  }
+
+  // ---- Live call events (call-start, status-update, transcript) -----------
+  if (type === "call-start" || type === "status-update" || type === "transcript") {
+    if (!vapiCallId) return ok({ ignored: "no_call_id" });
+    const { userId, agentId } = await resolveOwner();
+    if (!userId) return ok({ ignored: "no_owner" });
+
+    const statusFromVapi: string = type === "call-start"
+      ? "in-progress"
+      : (message?.status ?? message?.call?.status ?? "in-progress");
+    const safeStatus = ["ringing", "in-progress", "transferring", "ended", "failed"].includes(statusFromVapi)
+      ? statusFromVapi
+      : "in-progress";
+
+    const callerNumber = call.customer?.number ?? call.from ?? null;
+    const callerName = call.customer?.name ?? null;
+
+    const { data: ac, error: acErr } = await admin
+      .from("active_calls")
+      .upsert({
+        user_id: userId,
+        agent_id: agentId,
+        vapi_call_id: vapiCallId,
+        caller_number: callerNumber,
+        caller_name: callerName,
+        status: safeStatus,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "vapi_call_id" })
+      .select("id")
+      .single();
+
+    if (acErr) {
+      console.error("active_calls upsert failed", acErr);
+    } else if (ac) {
+      await admin.from("call_events").insert({
+        active_call_id: ac.id,
+        event_type: type,
+        payload: message ?? {},
+      });
+
+      // Push notification on call-start only
+      if (type === "call-start") {
+        try {
+          await admin.functions.invoke("send-push-notification", {
+            body: {
+              owner_user_id: userId,
+              title: "Incoming call",
+              body: callerName ? `${callerName} · ${callerNumber ?? ""}` : (callerNumber ?? "New call"),
+              data: { active_call_id: ac.id, vapi_call_id: vapiCallId },
+            },
+          });
+        } catch (e) {
+          console.error("push notify failed", e);
+        }
+      }
+    }
+    return ok({ handled: type });
+  }
+
+  // Vapi fires many event types — only the report below finalizes call_logs
   if (type !== "end-of-call-report") {
     return ok({ ignored: type ?? "unknown" });
   }
