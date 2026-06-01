@@ -73,6 +73,8 @@ Deno.serve(async (req) => {
       .upsert({
         owner_user_id: user.id,
         email,
+        display_name,
+        phone_number,
         role,
         can_listen: !!body.can_listen,
         can_transfer: !!body.can_transfer,
@@ -85,6 +87,7 @@ Deno.serve(async (req) => {
       .select()
       .single();
     if (memErr) throw memErr;
+
 
     // Generate token + store hash
     const token = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
