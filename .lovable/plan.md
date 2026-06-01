@@ -1,77 +1,112 @@
-## Goal
-Build a dedicated admin area where users with a new `super_admin` role can view, edit, toggle, delete, and re-sync any agent across all users (including its Vapi/Twilio resources).
+# Ringster Mobile — MVP Plan & Backend Prep
 
-## 1. Database
+Mobile client itself ships outside Lovable (Expo / React Native). Inside this project we prepare the backend the app will consume **and** expand the existing dashboard Team section so owners can manage members, devices, and permissions — all gated by their subscription plan.
 
-Add a new role and supporting access function (the existing `app_role` is a `text` column on `user_roles`, and `has_role(uuid, text)` already exists, so this is additive).
+---
 
-- Migration: insert `super_admin` as a valid role value and add a convenience function `is_super_admin(uuid)` (SECURITY DEFINER, `search_path = public`) that wraps `has_role(uid, 'super_admin')`.
-- Add RLS policies on `agent_configs` granting `super_admin` full SELECT / UPDATE / DELETE across all rows (in addition to existing owner policies).
-- Add matching admin-override RLS policies on related tables the admin tool reads/edits: `call_logs` (SELECT), `call_recordings` (SELECT), `calendar_tools` (ALL), `profiles` (SELECT, to show owner name/email).
-- Manual role grants happen via SQL — no self-promotion UI.
+## A. Mobile App (build outside Lovable)
 
-## 2. Routing & access control
+### Stack
+- **Expo (React Native)** — single codebase, OTA updates, Expo Push
+- **Supabase JS** — reuse project `owzerqaududhfwngyqbp`, same Auth + RLS
+- **Supabase Realtime** — subscribe to `active_calls` + `call_events`
+- **Vapi listen-live** — relayed through a backend function, API key never on device
+- **Push** — Expo tokens stored in `push_devices`, fan-out from `vapi-webhook`
 
-- New route tree under `/admin` with its own layout (`src/pages/Admin/AdminLayout.tsx`) — separate from `/dashboard`. Minimal sidebar with one entry today ("Agents") so we can grow the section later.
-- New `useSuperAdmin()` hook calling `is_super_admin(auth.uid())`; redirect non-admins to `/dashboard`.
-- Top-right link to `/admin` appears in the existing dashboard `UserProfile` menu only when `useSuperAdmin()` returns true.
+### Build order
+1. Auth + device registration (`push_devices`)
+2. Push on call start
+3. Active call screen (Realtime on `active_calls`)
+4. Live transcript (Realtime on `call_events`)
+5. Transfer from directory (new edge function reusing `transfer_directory`)
+6. Listen live (audio relay — last)
+7. Call history (existing `call_logs` + `call_recordings`)
+8. Team roles enforced via RLS + edge-function checks
 
-## 3. Admin Agents list — `/admin/agents`
+---
 
-- Server-side query: all `agent_configs` joined with `profiles` (owner email/full_name) and aggregated usage from `call_logs` (count + total minutes last 30d).
-- Table columns: Name, Owner (email), Type (inbound/outbound), Status, Phone, Vapi assistant ID, Twilio SID, Minutes used, Last call, Actions.
-- Filters: search (name/owner/phone), status, agent_type, "has Vapi", "has Twilio".
-- Row actions: View, Edit, Toggle status, Delete, Re-sync Vapi.
-- Bulk actions: toggle status, delete.
+## B. Backend prep (this Lovable project)
 
-## 4. Admin Agent detail — `/admin/agents/:id`
+### B1. New tables (one migration)
+- **`active_calls`** — live, in-progress calls. Created on Vapi `call-start`, marked ended on `end-of-call-report`.
+  Cols: `id`, `user_id` (owner), `agent_id`, `vapi_call_id`, `caller_number`, `caller_name`, `status`, `stream_url`, `started_at`, `updated_at`.
+- **`call_events`** — append-only event stream (transcript chunks, status, transfer requests). Powers live transcript via Realtime.
+  Cols: `id`, `active_call_id`, `call_log_id` nullable, `event_type`, `payload jsonb`, `created_at`.
+- **`push_devices`** — Expo/APNs/FCM tokens per user.
+  Cols: `id`, `user_id`, `device_token`, `platform`, `app_version`, `last_seen_at`.
+- **`team_members`** — actual table (today only a TS type exists).
+  Cols: `id`, `owner_user_id`, `member_user_id`, `email` (for pending invites), `role` (`admin|listener|transfer_only|viewer`), `can_listen`, `can_transfer`, `receives_notifications`, `status` (`pending|active|revoked`), `invited_at`, `accepted_at`.
+- **`team_invites`** — single-use invite tokens for email-based onboarding.
+  Cols: `id`, `owner_user_id`, `email`, `role`, `token_hash`, `expires_at`, `accepted_at`.
 
-Reuses the existing `AgentForm` (`src/components/agents/AgentForm.tsx`) so admins edit the same fields owners do — name, greeting/goodbye, voice, transfer directory, advanced config, calendar booking. Saves go through the standard supabase update (allowed by the new admin RLS policy).
+All five get the standard GRANT block + RLS:
+- Owner sees/edits their own members & devices.
+- Members see active calls / events for the owner that invited them, scoped through `team_members`.
+- A `SECURITY DEFINER` helper `team_member_has_access(_owner uuid, _member uuid, _cap text)` keeps policies non-recursive.
 
-Side panel: Vapi/Twilio resource management
+### B2. Extend `vapi-webhook`
+Today handles only `end-of-call-report`. Add:
+- `call-start` / `status-update` → upsert `active_calls`, insert `call_events`, call `send-push-notification`
+- `transcript` → insert `call_events` row (Realtime pushes to app)
+- `end-of-call-report` → unchanged finalize + flip `active_calls.status='ended'`
 
-- **Vapi assistant**: show `vapi_assistant_id`, last sync time. Buttons: "Re-sync with Vapi" (calls existing `VapiAssistantUpdateService.syncAgentWithVapi`), "View on Vapi" (deep link).
-- **Twilio number**: show `phone_number`, `twilio_sid`. Buttons: "Re-provision number" (calls existing `manage-twilio-number` Netlify function), "Release number".
-- **Transfer tool**: show current `transfer_directory` JSON and the resulting Vapi tool destinations (read-only preview rendered via the existing transfer-tool builder logic).
-- **Calendar tool**: show linked `calendar_tools` row, allow enable/disable.
-- **Recent calls**: last 20 `call_logs` for this agent with status, duration, timestamps.
-- **Audit footer**: created_at, updated_at, owner profile link.
+### B3. New edge functions
+- `send-push-notification` — internal, fans out to owner + every `team_members` row with `receives_notifications=true`. Needs `EXPO_ACCESS_TOKEN` secret.
+- `register-push-device` — auth-required upsert into `push_devices`.
+- `mobile-transfer-call` — auth-required; verifies caller is owner OR active team member with `can_transfer`; then calls existing Vapi transfer logic. Reuses `agent_configs.transfer_directory`.
+- `get-live-stream-url` — auth-required; verifies `can_listen`; returns short-lived signed URL for the Vapi listen-live websocket.
+- `invite-team-member` — auth-required; creates `team_invites` row, emails invite via existing Resend setup.
+- `accept-team-invite` — public-with-token; validates `token_hash`, links `member_user_id` to the row, flips status to `active`.
 
-## 5. Netlify function hardening
+### B4. Realtime
+Enable Supabase Realtime publication on `active_calls` and `call_events`.
 
-For any Netlify function reachable from the admin tool (`manage-twilio-number`, `manage-vapi-assistant`), add a check: if the caller's JWT user is `super_admin`, allow operating on agents owned by a different user; otherwise keep current owner-only check. No new function is required — they already exist.
+---
 
-## 6. UX details
+## C. Dashboard Team section — full build-out with plan gating
 
-- Reuse shadcn `Table`, `DropdownMenu`, `Dialog`, `Tabs`. Match the calm premium dashboard look — no new design tokens.
-- Confirm dialogs for destructive actions (delete agent, release number).
-- Toasts via existing `useToast`.
-- Empty state, loading skeletons, error states consistent with the rest of the app.
+Today `src/pages/Dashboard/Team.tsx` is a stub ("coming soon"). Replace it with a real management UI, and gate everything by subscription plan.
 
-## Technical notes (developer reference)
+### C1. Plan gating rules (read from existing `useSubscriptionFeatures` / `plan_features`)
+| Plan | Team seats | Mobile devices per user | Notes |
+|---|---|---|---|
+| Free | 0 (owner only) | 1 | Team tab visible but locked with upgrade CTA |
+| Receptionist | 1 extra seat | 2 | Matches the "1 team member US/Canada" spec for the new plan |
+| Starter | 3 | 3 | |
+| Growth / Pro | 10 | unlimited | |
+| Enterprise | unlimited | unlimited | |
 
-```text
-src/
-  pages/Admin/
-    AdminLayout.tsx
-    Agents/
-      index.tsx              # list
-      [id].tsx               # detail
-  hooks/useSuperAdmin.ts
-  components/admin/
-    AdminSidebar.tsx
-    AgentsTable.tsx
-    AgentResourcesPanel.tsx
-    AgentRecentCalls.tsx
-```
+Add a `team_seats_limit` + `mobile_devices_limit` column to `plan_features` in the same migration as B1, defaulted per plan above. Enforce limits in `invite-team-member` and `register-push-device`.
 
-- Add `/admin/*` routes in `src/App.tsx` behind `useSuperAdmin` guard.
-- All admin queries pass through Supabase client (RLS enforces access). No service-role usage in the browser.
-- Re-sync / re-provision actions call existing Netlify functions via `getNetlifyFunctionsUrl` (per the cross-environment routing rule).
+### C2. New `/dashboard/team` page
+- **Members table** — name/email, role, capabilities (listen/transfer/notify toggles), status (pending/active), last seen, actions (resend invite, edit, revoke).
+- **Invite drawer** — email + role + per-capability switches; shows seat usage `2 / 3 used`; disabled with upgrade CTA at limit.
+- **Pending invites** — list with resend / revoke.
+- **Mobile devices panel** — per member: registered Expo devices, platform, last seen, "Sign out device" action.
+- **Empty state** for Free plan: explainer + "Upgrade to invite teammates" CTA → `/dashboard/subscription`.
 
-## Out of scope (for this iteration)
+### C3. Sidebar gating
+- Keep "Team" in `ManagementMenu.tsx` for everyone (discoverability) but add a `Lock` icon (same pattern already used for Live Call Assist) when `team_seats_limit === 0`.
+- When locked, clicking still routes to `/dashboard/team` which renders the upgrade empty state — no silent redirect.
 
-- Promoting/demoting roles from the UI (done manually in SQL).
-- Editing owner of an agent.
-- Cross-user usage analytics dashboards (just per-agent recent calls).
-- A general "all users" admin view (only agents this round).
+### C4. Reusable hook
+`useTeamAccess()` returns `{ seatsLimit, seatsUsed, devicesLimit, canInvite, isLocked }`. Used by both the sidebar lock icon and the Team page UI states.
+
+---
+
+## D. Secrets to add later
+- `EXPO_ACCESS_TOKEN` — Expo push
+- (optional) `VAPI_STREAM_RELAY_SECRET` — when wiring listen-live
+
+---
+
+## Out of scope
+- Mobile code in this repo (lives in a separate Expo project)
+- "Join call / barge in" softphone
+- Internal app-to-app calling
+- Promoting users to `super_admin` from UI (manual SQL stays)
+
+---
+
+## Suggested next step
+Approve and I'll start with **one migration covering B1 + the two `plan_features` columns**, then the **Team page rebuild + sidebar gating** (pure UI, immediately visible), then extend `vapi-webhook` and add the four new edge functions. Listen-live audio relay lands last so the data + UX layers are solid first.
