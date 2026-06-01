@@ -32,6 +32,7 @@ import Onboarding from "./pages/Onboarding";
 import AdminLayout from "./pages/Admin/AdminLayout";
 import AdminAgentsList from "./pages/Admin/Agents/AdminAgentsList";
 import AdminAgentDetail from "./pages/Admin/Agents/AdminAgentDetail";
+import AcceptInvite from "./pages/AcceptInvite";
 
 const queryClient = new QueryClient();
 
@@ -123,6 +124,7 @@ function App() {
             <Route path="/ebook-thank-you" element={<EbookThankYou />} />
             <Route path="/offer" element={<Offer />} />
             <Route path="/roi-calculator" element={<ROICalculator />} />
+            <Route path="/team/accept-invite" element={<AcceptInvite />} />
             <Route path="/onboarding" element={
               <PrivateRoute>
                 <Onboarding />
