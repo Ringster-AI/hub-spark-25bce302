@@ -197,7 +197,9 @@ const Team = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-center">Listen</TableHead>
@@ -209,7 +211,25 @@ const Team = () => {
                 <TableBody>
                   {members.map(m => (
                     <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.email}</TableCell>
+                      <TableCell className="font-medium">{m.display_name ?? "—"}</TableCell>
+                      <TableCell>{m.email}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <Input
+                          defaultValue={m.phone_number ?? ""}
+                          placeholder="+1…"
+                          className="h-8 w-36"
+                          onBlur={(e) => {
+                            const next = e.currentTarget.value.trim() || null;
+                            if (next === (m.phone_number ?? null)) return;
+                            if (next && !/^\+[1-9]\d{6,14}$/.test(next)) {
+                              toast.error("Phone must be E.164 (e.g. +16475235895)");
+                              e.currentTarget.value = m.phone_number ?? "";
+                              return;
+                            }
+                            updateCapability.mutate({ id: m.id, patch: { phone_number: next } as any });
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="capitalize">{m.role.replace("_", " ")}</TableCell>
                       <TableCell>
                         <Badge variant={m.status === "active" ? "default" : "secondary"}>
