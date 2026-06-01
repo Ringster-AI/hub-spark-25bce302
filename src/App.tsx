@@ -124,6 +124,7 @@ function App() {
             <Route path="/ebook-thank-you" element={<EbookThankYou />} />
             <Route path="/offer" element={<Offer />} />
             <Route path="/roi-calculator" element={<ROICalculator />} />
+            <Route path="/team/accept-invite" element={<AcceptInvite />} />
             <Route path="/onboarding" element={
               <PrivateRoute>
                 <Onboarding />
