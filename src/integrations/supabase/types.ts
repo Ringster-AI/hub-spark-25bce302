@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_calls: {
+        Row: {
+          agent_id: string | null
+          caller_name: string | null
+          caller_number: string | null
+          ended_at: string | null
+          id: string
+          metadata: Json
+          started_at: string
+          status: string
+          stream_url: string | null
+          updated_at: string
+          user_id: string
+          vapi_call_id: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          ended_at?: string | null
+          id?: string
+          metadata?: Json
+          started_at?: string
+          status?: string
+          stream_url?: string | null
+          updated_at?: string
+          user_id: string
+          vapi_call_id?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          ended_at?: string | null
+          id?: string
+          metadata?: Json
+          started_at?: string
+          status?: string
+          stream_url?: string | null
+          updated_at?: string
+          user_id?: string
+          vapi_call_id?: string | null
+        }
+        Relationships: []
+      }
       agent_configs: {
         Row: {
           advanced_config: Json | null
@@ -381,6 +426,41 @@ export type Database = {
             columns: ["campaign_id"]
             isOneToOne: false
             referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_events: {
+        Row: {
+          active_call_id: string
+          call_log_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          active_call_id: string
+          call_log_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+        }
+        Update: {
+          active_call_id?: string
+          call_log_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_events_active_call_id_fkey"
+            columns: ["active_call_id"]
+            isOneToOne: false
+            referencedRelation: "active_calls"
             referencedColumns: ["id"]
           },
         ]
@@ -1373,6 +1453,36 @@ export type Database = {
         }
         Relationships: []
       }
+      push_devices: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          device_token: string
+          id: string
+          last_seen_at: string
+          platform: string
+          user_id: string
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          device_token: string
+          id?: string
+          last_seen_at?: string
+          platform: string
+          user_id: string
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          device_token?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rate_limits: {
         Row: {
           action_type: string
@@ -1413,6 +1523,7 @@ export type Database = {
           is_active: boolean | null
           is_pay_as_you_go: boolean | null
           max_agents: number
+          max_mobile_devices: number
           max_team_members: number
           minutes_allowance: number
           name: string
@@ -1432,6 +1543,7 @@ export type Database = {
           is_active?: boolean | null
           is_pay_as_you_go?: boolean | null
           max_agents: number
+          max_mobile_devices?: number
           max_team_members: number
           minutes_allowance: number
           name: string
@@ -1451,6 +1563,7 @@ export type Database = {
           is_active?: boolean | null
           is_pay_as_you_go?: boolean | null
           max_agents?: number
+          max_mobile_devices?: number
           max_team_members?: number
           minutes_allowance?: number
           name?: string
@@ -1496,6 +1609,98 @@ export type Database = {
           name?: string
           phone_number?: string
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      team_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          owner_user_id: string
+          team_member_id: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          owner_user_id: string
+          team_member_id: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          owner_user_id?: string
+          team_member_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invites_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          accepted_at: string | null
+          can_listen: boolean
+          can_transfer: boolean
+          created_at: string
+          email: string
+          id: string
+          invited_at: string
+          member_user_id: string | null
+          owner_user_id: string
+          receives_notifications: boolean
+          revoked_at: string | null
+          role: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          can_listen?: boolean
+          can_transfer?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          invited_at?: string
+          member_user_id?: string | null
+          owner_user_id: string
+          receives_notifications?: boolean
+          revoked_at?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          can_listen?: boolean
+          can_transfer?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          invited_at?: string
+          member_user_id?: string | null
+          owner_user_id?: string
+          receives_notifications?: boolean
+          revoked_at?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1815,6 +2020,10 @@ export type Database = {
       sync_user_subscription: {
         Args: { p_plan_id?: string; p_user_id: string }
         Returns: undefined
+      }
+      team_member_has_access: {
+        Args: { _cap?: string; _member: string; _owner: string }
+        Returns: boolean
       }
       update_minutes_used: {
         Args: { p_minutes: number; p_user_id: string }
