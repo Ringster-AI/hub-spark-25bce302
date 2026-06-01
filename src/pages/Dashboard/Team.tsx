@@ -26,6 +26,8 @@ type Role = "admin" | "listener" | "transfer_only" | "viewer";
 interface TeamMember {
   id: string;
   email: string;
+  display_name: string | null;
+  phone_number: string | null;
   role: Role;
   status: "pending" | "active" | "revoked";
   can_listen: boolean;
