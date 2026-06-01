@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { useLiveCoachAccess } from "@/hooks/useLiveCoachAccess";
+import { useTeamAccess } from "@/hooks/useTeamAccess";
 
 interface ManagementMenuProps {
   onLinkClick?: () => void;
@@ -18,14 +19,15 @@ interface ManagementMenuProps {
 export const ManagementMenu = ({ onLinkClick }: ManagementMenuProps) => {
   const location = useLocation();
   const { data: liveCoachAccess } = useLiveCoachAccess();
+  const { isLocked: teamLocked } = useTeamAccess();
 
   const isActive = (path: string) => location.pathname.startsWith(path);
 
   const menuItems = [
-    { path: "/dashboard/calendar", label: "Calendar", icon: Calendar },
-    { path: "/dashboard/recordings", label: "Recordings", icon: Mic },
-    { path: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-    { path: "/dashboard/team", label: "Team", icon: Users },
+    { path: "/dashboard/calendar", label: "Calendar", icon: Calendar, locked: false },
+    { path: "/dashboard/recordings", label: "Recordings", icon: Mic, locked: false },
+    { path: "/dashboard/analytics", label: "Analytics", icon: BarChart3, locked: false },
+    { path: "/dashboard/team", label: "Team", icon: Users, locked: teamLocked },
   ];
 
   // Live Call Coach is locked only for Free users (limit === 0)
@@ -44,7 +46,7 @@ export const ManagementMenu = ({ onLinkClick }: ManagementMenuProps) => {
                 <Link
                   to={item.path}
                   className={cn(
-                    "flex items-center gap-3 w-full px-6 py-2.5 rounded-lg transition-all duration-150",
+                    "flex items-center justify-between gap-3 w-full px-6 py-2.5 rounded-lg transition-all duration-150",
                     "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                     isActive(item.path) && [
                       "text-foreground bg-muted",
@@ -53,11 +55,16 @@ export const ManagementMenu = ({ onLinkClick }: ManagementMenuProps) => {
                   )}
                   onClick={onLinkClick}
                 >
-                  <item.icon className={cn(
-                    "h-4.5 w-4.5 transition-colors",
-                    isActive(item.path) ? "text-primary" : "text-muted-foreground"
-                  )} />
-                  <span className="font-medium">{item.label}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <item.icon className={cn(
+                      "h-4.5 w-4.5 transition-colors",
+                      isActive(item.path) ? "text-primary" : "text-muted-foreground"
+                    )} />
+                    <span className="font-medium truncate">{item.label}</span>
+                  </div>
+                  {item.locked && (
+                    <Lock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  )}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
