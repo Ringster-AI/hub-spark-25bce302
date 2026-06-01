@@ -32,6 +32,7 @@ import Onboarding from "./pages/Onboarding";
 import AdminLayout from "./pages/Admin/AdminLayout";
 import AdminAgentsList from "./pages/Admin/Agents/AdminAgentsList";
 import AdminAgentDetail from "./pages/Admin/Agents/AdminAgentDetail";
+import AcceptInvite from "./pages/AcceptInvite";
 
 const queryClient = new QueryClient();
 
