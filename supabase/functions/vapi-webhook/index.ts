@@ -187,6 +187,28 @@ Deno.serve(async (req) => {
       return ok({ error: error.message }, 500);
     }
 
+    // Mark live call as ended + append final event
+    if (vapiCallId) {
+      const { data: ac } = await admin
+        .from("active_calls")
+        .update({
+          status: "ended",
+          ended_at: endedAt ?? new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("vapi_call_id", vapiCallId)
+        .select("id")
+        .maybeSingle();
+      if (ac) {
+        await admin.from("call_events").insert({
+          active_call_id: ac.id,
+          call_log_id: data,
+          event_type: "end-of-call-report",
+          payload: { duration_seconds: durationSeconds },
+        });
+      }
+    }
+
     return ok({ call_log_id: data, minutes_charged: Math.max(1, Math.ceil(durationSeconds / 60)) });
   } catch (err: any) {
     console.error("vapi-webhook error", err);
