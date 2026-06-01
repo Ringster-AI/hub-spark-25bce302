@@ -26,6 +26,8 @@ type Role = "admin" | "listener" | "transfer_only" | "viewer";
 interface TeamMember {
   id: string;
   email: string;
+  display_name: string | null;
+  phone_number: string | null;
   role: Role;
   status: "pending" | "active" | "revoked";
   can_listen: boolean;
@@ -195,7 +197,9 @@ const Team = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-center">Listen</TableHead>
@@ -207,7 +211,25 @@ const Team = () => {
                 <TableBody>
                   {members.map(m => (
                     <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.email}</TableCell>
+                      <TableCell className="font-medium">{m.display_name ?? "—"}</TableCell>
+                      <TableCell>{m.email}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <Input
+                          defaultValue={m.phone_number ?? ""}
+                          placeholder="+1…"
+                          className="h-8 w-36"
+                          onBlur={(e) => {
+                            const next = e.currentTarget.value.trim() || null;
+                            if (next === (m.phone_number ?? null)) return;
+                            if (next && !/^\+[1-9]\d{6,14}$/.test(next)) {
+                              toast.error("Phone must be E.164 (e.g. +16475235895)");
+                              e.currentTarget.value = m.phone_number ?? "";
+                              return;
+                            }
+                            updateCapability.mutate({ id: m.id, patch: { phone_number: next } as any });
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="capitalize">{m.role.replace("_", " ")}</TableCell>
                       <TableCell>
                         <Badge variant={m.status === "active" ? "default" : "secondary"}>
@@ -303,6 +325,8 @@ interface InviteDialogProps {
 const InviteDialog = ({ open, onOpenChange }: InviteDialogProps) => {
   const qc = useQueryClient();
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [role, setRole] = useState<Role>("viewer");
   const [canListen, setCanListen] = useState(false);
   const [canTransfer, setCanTransfer] = useState(false);
@@ -313,6 +337,8 @@ const InviteDialog = ({ open, onOpenChange }: InviteDialogProps) => {
       const { data, error } = await supabase.functions.invoke("invite-team-member", {
         body: {
           email: email.trim().toLowerCase(),
+          display_name: displayName.trim() || null,
+          phone_number: phoneNumber.trim() || null,
           role,
           can_listen: canListen,
           can_transfer: canTransfer,
@@ -328,6 +354,8 @@ const InviteDialog = ({ open, onOpenChange }: InviteDialogProps) => {
       qc.invalidateQueries({ queryKey: ["team-members"] });
       qc.invalidateQueries({ queryKey: ["team-members-count"] });
       setEmail("");
+      setDisplayName("");
+      setPhoneNumber("");
       setRole("viewer");
       setCanListen(false);
       setCanTransfer(false);
@@ -348,6 +376,15 @@ const InviteDialog = ({ open, onOpenChange }: InviteDialogProps) => {
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
+            <Label htmlFor="invite-name">Name</Label>
+            <Input
+              id="invite-name"
+              placeholder="Jane Smith"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="invite-email">Email</Label>
             <Input
               id="invite-email"
@@ -356,6 +393,19 @@ const InviteDialog = ({ open, onOpenChange }: InviteDialogProps) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="invite-phone">Phone (E.164, optional)</Label>
+            <Input
+              id="invite-phone"
+              type="tel"
+              placeholder="+16475235895"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Required to use this teammate as a transfer destination on an agent.
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Role</Label>
