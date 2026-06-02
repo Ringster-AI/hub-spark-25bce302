@@ -7,6 +7,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const VAPI_SERVER_MESSAGES = [
+  'status-update',
+  'transcript',
+  'end-of-call-report',
+];
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -79,6 +85,7 @@ serve(async (req) => {
 
     if (action === 'update' || action === 'create') {
       // Create the correct VAPI assistant configuration
+      const vapiServerSecret = Deno.env.get('VAPI_SERVER_SECRET');
       vapiConfig = {
         name: agent.name,
         model: {
@@ -104,7 +111,16 @@ serve(async (req) => {
         firstMessage: agent.greeting || 'Hello! How can I help you today?',
         endCallMessage: agent.goodbye || 'Thank you for calling. Have a great day!',
         silenceTimeoutSeconds: 30,
-        maxDurationSeconds: 600
+        maxDurationSeconds: 600,
+        server: {
+          url: `${supabaseUrl}/functions/v1/vapi-webhook`,
+          ...(vapiServerSecret ? { secret: vapiServerSecret } : {}),
+        },
+        serverMessages: VAPI_SERVER_MESSAGES,
+        metadata: {
+          agent_id: agent.id,
+          user_id: agent.user_id,
+        },
       };
 
       console.log('VAPI Configuration:', JSON.stringify(vapiConfig, null, 2));

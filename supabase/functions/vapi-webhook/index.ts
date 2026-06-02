@@ -7,6 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const LIVE_STATUSES = ["scheduled", "queued", "ringing", "in-progress", "forwarding", "transferring"];
+const ENDED_STATUSES = ["ended", "failed"];
+const STATUS_ALIASES: Record<string, string> = {
+  forwarding: "transferring",
+};
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const VAPI_SERVER_SECRET = Deno.env.get("VAPI_SERVER_SECRET");
@@ -74,7 +80,9 @@ Deno.serve(async (req) => {
   }
 
   // ---- Live call events (call-start, status-update, transcript) -----------
-  if (type === "call-start" || type === "status-update" || type === "transcript") {
+  const rawStatus = String(message?.status ?? message?.call?.status ?? "").toLowerCase();
+  const isLiveStatusUpdate = type === "status-update" && LIVE_STATUSES.includes(rawStatus);
+  if (type === "call-start" || type === "transcript" || isLiveStatusUpdate) {
     if (!vapiCallId) return ok({ ignored: "no_call_id" });
     const { userId, agentId } = await resolveOwner();
     if (!userId) return ok({ ignored: "no_owner" });
@@ -82,8 +90,9 @@ Deno.serve(async (req) => {
     const statusFromVapi: string = type === "call-start"
       ? "in-progress"
       : (message?.status ?? message?.call?.status ?? "in-progress");
-    const safeStatus = ["ringing", "in-progress", "transferring", "ended", "failed"].includes(statusFromVapi)
-      ? statusFromVapi
+    const normalizedStatus = STATUS_ALIASES[String(statusFromVapi).toLowerCase()] ?? String(statusFromVapi).toLowerCase();
+    const safeStatus = ["ringing", "in-progress", "transferring", "ended", "failed"].includes(normalizedStatus)
+      ? normalizedStatus
       : "in-progress";
 
     const callerNumber = call.customer?.number ?? call.from ?? null;
@@ -112,8 +121,8 @@ Deno.serve(async (req) => {
         payload: message ?? {},
       });
 
-      // Push notification on call-start only
-      if (type === "call-start") {
+      // Push notification when the live row is first created
+      if (type === "call-start" || (type === "status-update" && safeStatus === "ringing")) {
         try {
           await admin.functions.invoke("send-push-notification", {
             body: {
@@ -128,7 +137,19 @@ Deno.serve(async (req) => {
         }
       }
     }
-    return ok({ handled: type });
+    return ok({ handled: type, status: safeStatus });
+  }
+
+  if (type === "status-update" && ENDED_STATUSES.includes(rawStatus) && vapiCallId) {
+    await admin
+      .from("active_calls")
+      .update({
+        status: rawStatus,
+        ended_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("vapi_call_id", vapiCallId);
+    return ok({ handled: type, status: rawStatus });
   }
 
   // Vapi fires many event types — only the report below finalizes call_logs

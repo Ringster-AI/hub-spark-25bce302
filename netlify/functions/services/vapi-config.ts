@@ -33,6 +33,12 @@ export interface VapiAssistantConfig {
   metadata?: Record<string, unknown>;
 }
 
+export const VAPI_SERVER_MESSAGES = [
+  "status-update",
+  "transcript",
+  "end-of-call-report",
+] as const;
+
 /**
  * Build supplemental system prompt context from agent config.
  * This includes transfer directory mappings and calendar booking instructions.
@@ -147,7 +153,7 @@ export const createVapiAssistantConfig = (
     endCallMessage: agent.goodbye || "Thank you for calling. Goodbye!",
     silenceTimeoutSeconds: 30,
     maxDurationSeconds: 600,
-    ...(server ? { server, serverMessages: ["end-of-call-report"] } : {}),
+    ...(server ? { server, serverMessages: [...VAPI_SERVER_MESSAGES] } : {}),
     metadata: {
       agent_id: agent.id,
       user_id: agent.user_id,
