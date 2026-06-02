@@ -40,7 +40,6 @@ const Profile = () => {
         .update({
           full_name: values.full_name,
           username: values.username,
-          email: values.email,
           phone: values.phone,
           website: values.website,
           bio: values.bio,
@@ -55,7 +54,7 @@ const Profile = () => {
         description: "Your profile has been successfully updated.",
       });
       
-      refetch(); // Refresh the profile data
+      refetch();
     } catch (error) {
       console.error("Error updating profile:", error);
       toast({
@@ -68,11 +67,9 @@ const Profile = () => {
     }
   };
 
-  // Default values for the form
   const defaultValues: ProfileFormValues = {
     full_name: profile?.full_name || "",
     username: profile?.username || "",
-    email: profile?.email || "",
     phone: profile?.phone || "",
     website: profile?.website || "",
     bio: profile?.bio || "",
@@ -84,6 +81,7 @@ const Profile = () => {
       <div className="max-w-2xl">
         <ProfileForm
           defaultValues={defaultValues}
+          currentEmail={profile?.email || ""}
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
         />
