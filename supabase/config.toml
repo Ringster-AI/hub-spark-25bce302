@@ -1,87 +1,80 @@
-
 project_id = "owzerqaududhfwngyqbp"
 
+[analytics]
+  enabled = false
+
 [api]
-enabled = true
-port = 54321
-schemas = ["public", "graphql_public"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
+  enabled = true
+  extra_search_path = ["public", "extensions"]
+  max_rows = 1000
+  port = 54321
+  schemas = ["public", "graphql_public"]
 
 [auth]
-enabled = true
-port = 54322
-external_url = "http://localhost:54321"
-email_double_confirm_changes = true
-email_enable_signup = true
-email_enable_confirmations = false
-password_min_length = 6
-
-[auth.email]
-smtp_host = ""
-smtp_port = 587
-smtp_user = ""
-smtp_pass = ""
-smtp_admin_email = ""
-enable_signup = true
-double_confirm_changes = true
-enable_confirmations = false
+  email_double_confirm_changes = true
+  email_enable_confirmations = false
+  email_enable_signup = true
+  enabled = true
+  external_url = "http://localhost:54321"
+  password_min_length = 6
+  port = 54322
+  [auth.email]
+    double_confirm_changes = true
+    enable_confirmations = false
+    enable_signup = true
+    smtp_admin_email = ""
+    smtp_host = ""
+    smtp_pass = ""
+    smtp_port = 587
+    smtp_user = ""
 
 [db]
-enabled = true
-port = 54322
-major_version = 15
+  enabled = true
+  major_version = 15
+  port = 54322
 
-[realtime]
-enabled = true
-port = 54323
-
-[studio]
-enabled = true
-port = 54324
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.connect-google]
+    allow_public_network_access = true
+    verify_jwt = false
+  [functions.delete-account]
+    verify_jwt = false
+  [functions.get-usage-data]
+    allow_public_network_access = true
+    verify_jwt = false
+  [functions.get-vapi-call-data]
+    verify_jwt = false
+  [functions.google-callback]
+    allow_public_network_access = true
+    verify_jwt = false
+  [functions.register-vapi-calendar-tools]
+    allow_public_network_access = true
+    verify_jwt = false
+  [functions.vapi-calendar-api]
+    allow_public_network_access = true
+    verify_jwt = false
+  [functions.vapi-calendar-tool]
+    verify_jwt = false
+  [functions.verify-phone]
+    verify_jwt = false
 
 [inbucket]
-enabled = true
-port = 54325
+  enabled = true
+  port = 54325
 
-[storage]
-enabled = true
-port = 54326
-
-[analytics]
-enabled = false
-
-[functions.connect-google]
-verify_jwt = false
-allow_public_network_access = true
-
-[functions.google-callback]
-verify_jwt = false
-allow_public_network_access = true
-
-[functions.get-usage-data]
-verify_jwt = false
-allow_public_network_access = true
-
-[functions.vapi-calendar-tool]
-verify_jwt = false
-
-[functions.verify-phone]
-verify_jwt = false
-
-[functions.get-vapi-call-data]
-verify_jwt = false
-
-[functions.delete-account]
-verify_jwt = false
-
-[functions.vapi-calendar-api]
-verify_jwt = false
-allow_public_network_access = true
-
-[functions.register-vapi-calendar-tools]
-verify_jwt = false
-allow_public_network_access = true
+[realtime]
+  enabled = true
+  port = 54323
 
 [shared_schema]
-migrations_dir = "migrations"
+  migrations_dir = "migrations"
+
+[storage]
+  enabled = true
+  port = 54326
+
+[studio]
+  enabled = true
+  port = 54324
