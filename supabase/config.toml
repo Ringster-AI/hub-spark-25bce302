@@ -67,6 +67,9 @@ project_id = "owzerqaududhfwngyqbp"
     verify_jwt = false
   [functions.handle-email-suppression]
     verify_jwt = false
+  [functions.email-lifecycle-cron]
+    verify_jwt = false
+
 
 [inbucket]
   enabled = true

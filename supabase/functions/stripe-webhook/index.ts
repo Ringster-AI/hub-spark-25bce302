@@ -46,32 +46,34 @@ serve(async (req) => {
 
     console.log(`🔔 Event received: ${event.type}`);
 
+    // Helper: fire-and-forget transactional email
+    async function sendEmail(templateName: string, recipientEmail: string, idempotencyKey: string, templateData: Record<string, unknown> = {}) {
+      try {
+        await supabase.functions.invoke('send-transactional-email', {
+          body: { templateName, recipientEmail, idempotencyKey, templateData },
+        });
+      } catch (e) {
+        console.error(`sendEmail ${templateName} failed`, e);
+      }
+    }
+
     switch (event.type) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
+        const previousAttributes = (event.data as any).previous_attributes ?? {};
         const customerId = subscription.customer;
         const priceId = subscription.items.data[0].price.id;
 
-        console.log('Processing subscription event:', {
-          customerId,
-          priceId,
-          status: subscription.status
-        });
-
-        // Get customer's email
         const customer = await stripe.customers.retrieve(customerId as string);
         if (!customer || !('email' in customer)) {
           throw new Error('No customer email found');
         }
 
-        console.log('Found customer:', customer.email);
-
-        // Get user by email
         const { data: users, error: userError } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, full_name')
           .eq('email', customer.email)
           .single();
 
@@ -80,12 +82,9 @@ serve(async (req) => {
           throw new Error(`No user found for email: ${customer.email}`);
         }
 
-        console.log('Found user:', users.id);
-
-        // Get plan from Stripe price ID
         const { data: plans, error: planError } = await supabase
           .from('subscription_plans')
-          .select('id')
+          .select('id, name')
           .eq('stripe_price_id', priceId)
           .single();
 
@@ -94,9 +93,6 @@ serve(async (req) => {
           throw new Error(`No plan found for price: ${priceId}`);
         }
 
-        console.log('Found plan:', plans.id);
-
-        // Update subscription with new plan ID and status
         const { error: updateError } = await supabase.rpc(
           'handle_subscription_update',
           {
@@ -108,22 +104,42 @@ serve(async (req) => {
           }
         );
 
-        if (updateError) {
-          console.error('Subscription update error:', updateError);
-          throw updateError;
+        if (updateError) throw updateError;
+
+        // Send plan-changed email when the price actually changed (not on initial create or simple status flips)
+        const priceChanged =
+          event.type === 'customer.subscription.updated' &&
+          previousAttributes?.items?.data?.[0]?.price?.id &&
+          previousAttributes.items.data[0].price.id !== priceId;
+
+        if (priceChanged) {
+          const prevPriceId = previousAttributes.items.data[0].price.id as string;
+          const { data: prevPlan } = await supabase
+            .from('subscription_plans')
+            .select('name')
+            .eq('stripe_price_id', prevPriceId)
+            .maybeSingle();
+
+          await sendEmail(
+            'plan-changed',
+            customer.email as string,
+            `plan-changed-${subscription.id}-${priceId}`,
+            {
+              name: users.full_name ?? undefined,
+              previousPlan: prevPlan?.name ?? 'Previous plan',
+              newPlan: plans.name,
+              effectiveDate: new Date(subscription.current_period_start * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+            },
+          );
         }
 
-        console.log(`✅ Successfully processed ${event.type} for ${customer.email}`);
+        console.log(`✅ Processed ${event.type} for ${customer.email}`);
         break;
       }
 
       case 'invoice.payment_succeeded': {
         const invoice: any = event.data.object;
-        // Only refresh credits on recurring renewals (not the first invoice — that's handled by initialize_user_credits)
-        if (invoice.billing_reason !== 'subscription_cycle') {
-          console.log(`Skipping invoice.payment_succeeded with billing_reason=${invoice.billing_reason}`);
-          break;
-        }
+        if (invoice.billing_reason !== 'subscription_cycle') break;
         const customerId = invoice.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
         if (!customer || !('email' in customer)) break;
@@ -132,31 +148,43 @@ serve(async (req) => {
         if (!u) break;
         const { error: resetErr } = await supabase.rpc('reset_monthly_credits', { p_user_id: u.id });
         if (resetErr) console.error('reset_monthly_credits error:', resetErr);
-        else console.log(`✅ Reset plan credits for ${customer.email}`);
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice: any = event.data.object;
+        const customerId = invoice.customer as string;
+        const customer = await stripe.customers.retrieve(customerId);
+        if (!customer || !('email' in customer)) break;
+        const { data: u } = await supabase
+          .from('profiles').select('id, full_name').eq('email', customer.email).maybeSingle();
+        const amountCents = invoice.amount_due ?? invoice.amount_remaining ?? 0;
+        const currency = (invoice.currency ?? 'usd').toUpperCase();
+        const amountStr = `${currency} ${(amountCents / 100).toFixed(2)}`;
+        const retryDate = invoice.next_payment_attempt
+          ? new Date(invoice.next_payment_attempt * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+          : undefined;
+        await sendEmail(
+          'payment-failed',
+          customer.email as string,
+          `payment-failed-${invoice.id}-${invoice.attempt_count ?? 1}`,
+          { name: u?.full_name ?? undefined, amount: amountStr, retryDate },
+        );
         break;
       }
 
       case 'checkout.session.completed': {
         const session: any = event.data.object;
-        if (session.mode !== 'payment' || session.metadata?.type !== 'credit_addon') {
-          console.log('Skipping non-addon checkout.session.completed');
-          break;
-        }
+        if (session.mode !== 'payment' || session.metadata?.type !== 'credit_addon') break;
         const userId = session.metadata?.supabaseUid;
         const priceId = session.metadata?.priceId;
-        if (!userId || !priceId) {
-          console.error('Missing supabaseUid or priceId in addon session metadata');
-          break;
-        }
+        if (!userId || !priceId) break;
         const { data: addonPlan, error: planErr } = await supabase
           .from('subscription_plans')
           .select('credits_allowance, name')
           .eq('stripe_price_id', priceId)
           .single();
-        if (planErr || !addonPlan?.credits_allowance) {
-          console.error('Add-on plan lookup error:', planErr);
-          break;
-        }
+        if (planErr || !addonPlan?.credits_allowance) break;
         const { error: addErr } = await supabase.rpc('add_credits', {
           p_user_id: userId,
           p_credits_amount: addonPlan.credits_allowance,
@@ -164,10 +192,10 @@ serve(async (req) => {
           p_description: `Add-on minute pack: ${addonPlan.name}`,
         });
         if (addErr) console.error('add_credits error:', addErr);
-        else console.log(`✅ Added ${addonPlan.credits_allowance} add-on credits to ${userId}`);
         break;
       }
     }
+
 
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
