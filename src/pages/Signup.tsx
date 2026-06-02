@@ -140,8 +140,23 @@ const Signup = () => {
         (window as any).fbq("track", "CompleteRegistration");
       }
 
+      // Fire-and-forget welcome email (idempotent on user id)
+      if (userId) {
+        supabase.functions
+          .invoke("send-transactional-email", {
+            body: {
+              templateName: "welcome",
+              recipientEmail: data.email,
+              idempotencyKey: `welcome-${userId}`,
+              templateData: { name: data.company },
+            },
+          })
+          .catch((e) => console.warn("welcome email enqueue failed", e));
+      }
+
       toast.success("Welcome to Ringster — let's launch your agent.");
       navigate("/onboarding");
+
     } catch (error: any) {
       console.error("Signup error:", error);
       toast.error(error?.message || "Failed to create account. Please try again.");

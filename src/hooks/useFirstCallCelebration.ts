@@ -61,6 +61,24 @@ export const useFirstCallCelebration = (): Result => {
         .eq("call_log_id", firstCall.id)
         .maybeSingle();
 
+      // Fire-and-forget celebration email (idempotent on call id)
+      if (user.email) {
+        supabase.functions
+          .invoke("send-transactional-email", {
+            body: {
+              templateName: "first-call-celebration",
+              recipientEmail: user.email,
+              idempotencyKey: `first-call-${firstCall.id}`,
+              templateData: {
+                fromNumber: firstCall.from_number,
+                duration: firstCall.duration,
+                recordingUrl: rec?.recording_url ?? undefined,
+              },
+            },
+          })
+          .catch((e) => console.warn("first-call email enqueue failed", e));
+      }
+
       return {
         ack: false,
         call: {
@@ -72,6 +90,7 @@ export const useFirstCallCelebration = (): Result => {
           recordingUrl: rec?.recording_url ?? null,
         },
       };
+
     },
     refetchInterval: 60_000,
   });
