@@ -107,7 +107,7 @@ export const FirstCallCelebration = () => {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="relative max-w-xl overflow-hidden border-indigo-500/30 bg-[#0a0a1a] p-0 text-white">
+      <DialogContent className="relative top-[40%] max-w-xl overflow-y-auto overflow-hidden border-indigo-500/30 bg-[#0a0a1a] p-0 text-white max-h-[85vh] [&>button[data-state=open]]:text-white [&>button[data-state=open]]:opacity-100 sm:top-[50%]">
         <ConfettiBurst />
         <div className="relative z-10 px-8 pt-10 pb-8">
           <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/30 to-amber-300/20 ring-1 ring-indigo-400/40">
