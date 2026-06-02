@@ -186,21 +186,21 @@ async function notifyOwnerAuthFailure(supabase: any, integration: any, userId: s
       .single()
 
     if (profile?.email) {
-      const resendKey = Deno.env.get('RESEND_API_KEY')
-      if (resendKey) {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: 'Ringster <notifications@ringster.ai>',
-            to: [profile.email],
-            subject: 'Action Required: Calendar Reconnection Needed',
-            html: `<p>Hi ${profile.full_name || 'there'},</p>
-              <p>Your calendar connection has expired or been revoked. Your AI agent can no longer book appointments until you reconnect.</p>
-              <p>Please log in to your Ringster dashboard and reconnect your calendar in Settings → Integrations.</p>
-              <p>— Ringster Team</p>`,
-          }),
-        }).catch(e => console.error('Failed to send auth failure email:', e))
+      try {
+        await supabase.functions.invoke('send-transactional-email', {
+          body: {
+            templateName: 'calendar-reconnect-required',
+            recipientEmail: profile.email,
+            idempotencyKey: `calendar-reconnect-${userId}-${new Date().toISOString().slice(0,10)}`,
+            templateData: {
+              name: profile.full_name || undefined,
+              provider: integration.provider || 'calendar',
+              reconnectUrl: 'https://ringster.ai/dashboard/settings',
+            },
+          },
+        })
+      } catch (e) {
+        console.error('Failed to send auth failure email:', e)
       }
     }
   } catch (e) {
