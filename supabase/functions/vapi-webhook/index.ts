@@ -215,6 +215,8 @@ Deno.serve(async (req) => {
       return ok({ error: error.message }, 500);
     }
 
+    const callLogId = data;
+
     // Mark live call as ended + append final event
     if (vapiCallId) {
       const { data: ac } = await admin
@@ -230,14 +232,98 @@ Deno.serve(async (req) => {
       if (ac) {
         await admin.from("call_events").insert({
           active_call_id: ac.id,
-          call_log_id: data,
+          call_log_id: callLogId,
           event_type: "end-of-call-report",
           payload: { duration_seconds: durationSeconds },
         });
       }
     }
 
-    return ok({ call_log_id: data, minutes_charged: Math.max(1, Math.ceil(durationSeconds / 60)) });
+    // Lifecycle/transactional emails ----------------------------------------
+    try {
+      const { data: owner } = await admin
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const ownerEmail = owner?.email as string | undefined;
+      if (ownerEmail) {
+        const endedReason = String(message?.endedReason ?? call?.endedReason ?? "").toLowerCase();
+        const isMissed =
+          durationSeconds < 5 ||
+          endedReason.includes("no-answer") ||
+          endedReason.includes("did-not-answer") ||
+          endedReason.includes("voicemail") ||
+          endedReason.includes("busy");
+        const callTimeStr = endedAt
+          ? new Date(endedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+          : undefined;
+
+        if (isMissed) {
+          await admin.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "missed-call-summary",
+              recipientEmail: ownerEmail,
+              idempotencyKey: `missed-call-${vapiCallId}`,
+              templateData: {
+                fromNumber,
+                callTime: callTimeStr,
+                reason: endedReason || "no answer",
+              },
+            },
+          });
+        } else if (recordingUrl) {
+          await admin.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "call-recording-ready",
+              recipientEmail: ownerEmail,
+              idempotencyKey: `recording-${vapiCallId}`,
+              templateData: {
+                fromNumber,
+                callTime: callTimeStr,
+                duration: durationSeconds,
+                recordingUrl,
+              },
+            },
+          });
+        }
+
+        // Low-credit warning: after this call's deduction, check remaining vs plan allowance
+        const { data: credits } = await admin
+          .from("user_credits")
+          .select("credits_remaining, current_period_start")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const { data: sub } = await admin
+          .from("user_subscriptions")
+          .select("subscription_plans(name, credits_allowance)")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const allowance = (sub as any)?.subscription_plans?.credits_allowance ?? 0;
+        const remaining = credits?.credits_remaining ?? 0;
+        if (allowance > 0 && remaining > 0 && remaining < allowance * 0.2) {
+          const periodKey = credits?.current_period_start ?? "no-period";
+          await admin.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "low-credit-warning",
+              recipientEmail: ownerEmail,
+              idempotencyKey: `low-credit-${userId}-${periodKey}`,
+              templateData: {
+                name: owner?.full_name ?? undefined,
+                creditsRemaining: remaining,
+                planName: (sub as any)?.subscription_plans?.name,
+              },
+            },
+          });
+        }
+      }
+    } catch (emailErr) {
+      console.error("post-call email enqueue failed", emailErr);
+    }
+
+    return ok({ call_log_id: callLogId, minutes_charged: Math.max(1, Math.ceil(durationSeconds / 60)) });
+
   } catch (err: any) {
     console.error("vapi-webhook error", err);
     return ok({ error: err?.message ?? "unknown" }, 500);
