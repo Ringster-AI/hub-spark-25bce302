@@ -24,9 +24,16 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return ok({ error: "method not allowed" }, 405);
 
-  // Shared-secret auth (configured as `server.secret` on the Vapi assistant)
+  // Shared-secret auth — supports Vapi "Bearer Auth", "Secret Token", or assistant-level server.secret
   if (VAPI_SERVER_SECRET) {
-    const provided = req.headers.get("x-vapi-secret") ?? req.headers.get("x-vapi-signature");
+    const authHeader = req.headers.get("authorization") ?? "";
+    const bearer = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7).trim()
+      : null;
+    const provided =
+      bearer ??
+      req.headers.get("x-vapi-secret") ??
+      req.headers.get("x-vapi-signature");
     if (provided !== VAPI_SERVER_SECRET) {
       console.warn("vapi-webhook: bad secret");
       return ok({ error: "unauthorized" }, 401);
