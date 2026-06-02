@@ -33,4 +33,5 @@ export const TEMPLATES: Record<string, TemplateEntry<any>> = {
   'low-credit-warning': lowCreditWarning,
   'plan-changed': planChanged,
   'payment-failed': paymentFailed,
+  'calendar-reconnect-required': calendarReconnectRequired,
 }
