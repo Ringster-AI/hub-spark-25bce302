@@ -915,35 +915,23 @@ async function googleBookAppointment(
 
   // Send confirmation email
   if (params.attendee_email) {
-    const resendKey = Deno.env.get('RESEND_API_KEY')
-    if (resendKey) {
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: 'Ringster <notifications@ringster.ai>',
-            to: [params.attendee_email],
-            subject: `Appointment Confirmed – ${formattedDate} at ${formattedTime} ${tz}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #1a1a1a; font-size: 24px; text-align: center;">Your Appointment is Confirmed ✅</h1>
-                <p style="color: #333;">Hi ${params.attendee_name},</p>
-                <p style="color: #333;">Your appointment has been successfully booked:</p>
-                <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #4f46e5;">
-                  <p style="margin: 8px 0;"><strong>📅 Date:</strong> ${formattedDate}</p>
-                  <p style="margin: 8px 0;"><strong>🕐 Time:</strong> ${formattedTime} ${tz}</p>
-                  <p style="margin: 8px 0;"><strong>⏱ Duration:</strong> ${duration} minutes</p>
-                  <p style="margin: 8px 0;"><strong>📋 Type:</strong> ${params.appointment_type || 'Consultation'}</p>
-                </div>
-                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;" />
-                <p style="color: #999; font-size: 12px; text-align: center;">Powered by Ringster AI</p>
-              </div>`,
-          }),
-        })
-      } catch (emailErr) {
-        console.error('Failed to send confirmation email:', emailErr)
-      }
+    try {
+      await supabase.functions.invoke('send-transactional-email', {
+        body: {
+          templateName: 'booking-confirmation',
+          recipientEmail: params.attendee_email,
+          idempotencyKey: `booking-confirm-${booking.id}`,
+          templateData: {
+            name: params.attendee_name,
+            bookingTitle: params.appointment_type || 'Consultation',
+            startTime: `${formattedDate} at ${formattedTime}`,
+            timezone: tz,
+            notes: params.notes || undefined,
+          },
+        },
+      })
+    } catch (emailErr) {
+      console.error('Failed to send confirmation email:', emailErr)
     }
   }
 
