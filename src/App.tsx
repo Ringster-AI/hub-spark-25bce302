@@ -34,6 +34,7 @@ import AdminAgentsList from "./pages/Admin/Agents/AdminAgentsList";
 import AdminAgentDetail from "./pages/Admin/Agents/AdminAgentDetail";
 import AcceptInvite from "./pages/AcceptInvite";
 import Unsubscribe from "./pages/Unsubscribe";
+import EmailChangeCallback from "./pages/EmailChangeCallback";
 
 const queryClient = new QueryClient();
 
