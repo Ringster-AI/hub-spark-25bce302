@@ -4,6 +4,8 @@ import { useSubscriptionFeatures } from "@/hooks/useSubscriptionFeatures";
 import { useToast } from "@/hooks/use-toast";
 import { AgentConfig } from "@/types/database/agents";
 import Vapi from "@vapi-ai/web";
+
+let activeVapi: Vapi | null = null;
 import { EditAgentDialog } from "./EditAgentDialog";
 import { AgentTrialWarning } from "./AgentTrialWarning";
 import { AgentHeader } from "./AgentHeader";
@@ -60,7 +62,14 @@ export const AgentCard = ({ agent, onToggleStatus, onUpdate }: AgentCardProps) =
       }
 
       console.log('Starting browser call with assistant ID:', assistantId);
+      if (activeVapi) {
+        try { await activeVapi.stop(); } catch (e) { console.warn('Failed to stop previous Vapi instance', e); }
+        activeVapi = null;
+      }
       const vapi = new Vapi(VAPI_PUBLIC_KEY);
+      activeVapi = vapi;
+      vapi.on('call-end', () => { if (activeVapi === vapi) activeVapi = null; });
+      vapi.on('error', () => { if (activeVapi === vapi) activeVapi = null; });
       await vapi.start(assistantId);
       
       toast({
