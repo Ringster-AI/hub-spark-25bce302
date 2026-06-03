@@ -1,29 +1,19 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
 import { Seo } from "@/components/seo/Seo";
-import { Sparkles, ShieldCheck, PhoneCall, Check, Loader2, ArrowLeft, Mail } from "lucide-react";
-import { toast } from "sonner";
+import { Sparkles, ShieldCheck, PhoneCall, Check, Loader2, LogIn } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
   const [checkingSession, setCheckingSession] = useState(true);
-  const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [resendIn, setResendIn] = useState(0);
+  const [password, setPassword] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,58 +27,30 @@ export default function Login() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  useEffect(() => {
-    if (resendIn <= 0) return;
-    const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(t);
-  }, [resendIn]);
-
-  const sendCode = async (resend = false) => {
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       setError("Please enter a valid email address.");
       return;
     }
-    setSending(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: { shouldCreateUser: false },
-      });
-      if (error) {
-        if (error.message.toLowerCase().includes("signups not allowed")) {
-          setError("No account found for this email. Please sign up first.");
-        } else {
-          setError(error.message);
-        }
-        return;
-      }
-      setStep("code");
-      setResendIn(30);
-      if (resend) toast.success("New code sent.");
-    } finally {
-      setSending(false);
+    if (!password) {
+      setError("Please enter your password.");
+      return;
     }
-  };
-
-  const verifyCode = async () => {
-    setError(null);
-    if (code.length !== 6) return;
-    setVerifying(true);
+    setSigningIn(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
-        token: code,
-        type: "email",
+        password,
       });
       if (error) {
-        setError("Invalid or expired code. Please try again.");
-        setCode("");
+        setError(error.message);
         return;
       }
       // onAuthStateChange will navigate
     } finally {
-      setVerifying(false);
+      setSigningIn(false);
     }
   };
 
@@ -121,14 +83,10 @@ export default function Login() {
 
           <div className="mx-auto w-full max-w-md flex-1">
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              {step === "email" ? "Welcome back" : "Check your email"}
+              Welcome back
             </h1>
             <p className="mt-2 text-sm text-white/60">
-              {step === "email"
-                ? "Sign in with a one-time code — no password needed."
-                : (
-                  <>We sent a 6-digit code to <span className="text-white/90">{email}</span></>
-                )}
+              Sign in to your Ringster account.
             </p>
 
             <div className="mt-8">
@@ -138,106 +96,42 @@ export default function Login() {
                 </Alert>
               )}
 
-              {step === "email" ? (
-                <form
-                  onSubmit={(e) => { e.preventDefault(); sendCode(); }}
-                  className="space-y-5"
-                >
-                  <div className="space-y-2">
-                    <Label className="text-white/80">Email</Label>
-                    <Input
-                      type="email"
-                      autoComplete="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
-                      placeholder="you@company.com"
-                      required
-                    />
-                  </div>
-                  <Button type="submit" size="lg" className="w-full" disabled={sending}>
-                    {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    <Mail className="mr-2 h-4 w-4" />
-                    Send sign-in code
-                  </Button>
-                </form>
-              ) : (
-                <div className="space-y-5">
-                  <div className="space-y-3">
-                    <Label className="text-white/80">Enter 6-digit code</Label>
-                    <div className="flex justify-center">
-                      <InputOTP
-                        maxLength={6}
-                        value={code}
-                        onChange={(v) => {
-                          setCode(v);
-                          if (v.length === 6) {
-                            // auto-submit
-                            setTimeout(() => {
-                              // use latest value via closure
-                              (async () => {
-                                setVerifying(true);
-                                setError(null);
-                                const { error } = await supabase.auth.verifyOtp({
-                                  email: email.trim().toLowerCase(),
-                                  token: v,
-                                  type: "email",
-                                });
-                                if (error) {
-                                  setError("Invalid or expired code. Please try again.");
-                                  setCode("");
-                                }
-                                setVerifying(false);
-                              })();
-                            }, 0);
-                          }
-                        }}
-                      >
-                        <InputOTPGroup>
-                          <InputOTPSlot index={0} />
-                          <InputOTPSlot index={1} />
-                          <InputOTPSlot index={2} />
-                        </InputOTPGroup>
-                        <InputOTPSeparator />
-                        <InputOTPGroup>
-                          <InputOTPSlot index={3} />
-                          <InputOTPSlot index={4} />
-                          <InputOTPSlot index={5} />
-                        </InputOTPGroup>
-                      </InputOTP>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    size="lg"
-                    className="w-full"
-                    disabled={verifying || code.length !== 6}
-                    onClick={verifyCode}
-                  >
-                    {verifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Verify & sign in
-                  </Button>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <button
-                      type="button"
-                      onClick={() => { setStep("email"); setCode(""); setError(null); }}
-                      className="flex items-center gap-1 text-white/60 hover:text-white"
-                    >
-                      <ArrowLeft className="h-3.5 w-3.5" /> Change email
-                    </button>
-                    <button
-                      type="button"
-                      disabled={resendIn > 0 || sending}
-                      onClick={() => sendCode(true)}
-                      className="text-indigo-300 hover:underline disabled:text-white/30 disabled:no-underline"
-                    >
-                      {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
-                    </button>
-                  </div>
+              <form onSubmit={handleSignIn} className="space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-white/80">Email</Label>
+                  <Input
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
+                    placeholder="you@company.com"
+                    required
+                  />
                 </div>
-              )}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-white/80">Password</Label>
+                    <Link to="/forgot-password" className="text-xs text-indigo-300 hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <Input
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+                <Button type="submit" size="lg" className="w-full" disabled={signingIn}>
+                  {signingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Sign in
+                </Button>
+              </form>
 
               <p className="mt-6 text-center text-sm text-white/50">
                 Don't have an account?{" "}
