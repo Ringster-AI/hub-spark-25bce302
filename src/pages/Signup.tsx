@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -7,8 +7,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Seo } from "@/components/seo/Seo";
-import { Loader2, Sparkles, ArrowRight, ArrowLeft, Check, ShieldCheck, PhoneCall } from "lucide-react";
-import { INDUSTRIES, USE_CASES, industryAgentName, industryGreeting } from "@/lib/industryDefaults";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import {
+  Loader2,
+  Sparkles,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  ShieldCheck,
+  PhoneCall,
+  Mail,
+} from "lucide-react";
+import {
+  INDUSTRIES,
+  USE_CASES,
+  industryAgentName,
+  industryGreeting,
+} from "@/lib/industryDefaults";
 import { ORGANIZATION_SIZES } from "@/types/auth";
 import {
   Select,
@@ -17,10 +37,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type FormValues = {
   email: string;
-  password: string;
   company: string;
   size: string;
   industry: string;
@@ -29,34 +49,18 @@ type FormValues = {
   marketingConsent: boolean;
 };
 
-const passwordIssues = (password: string) => {
-  const issues: string[] = [];
-  if (password.length < 6) issues.push("at least 6 characters");
-  if (!/[a-z]/.test(password)) issues.push("a lowercase letter");
-  if (!/[A-Z]/.test(password)) issues.push("an uppercase letter");
-  if (!/[0-9]/.test(password)) issues.push("a number");
-  return issues;
-};
-
-const passwordScore = (password: string) => {
-  let score = 0;
-  if (password.length >= 6) score++;
-  if (password.length >= 10) score++;
-  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
-  if (/[0-9]/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
-  return Math.min(score, 4);
-};
-
 const Signup = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     defaultValues: {
       email: "",
-      password: "",
       company: "",
       size: "",
       industry: "",
@@ -67,8 +71,6 @@ const Signup = () => {
   });
 
   const values = form.watch();
-  const issues = passwordIssues(values.password || "");
-  const score = passwordScore(values.password || "");
 
   const previewAgentName = useMemo(
     () => industryAgentName(values.industry),
@@ -79,43 +81,76 @@ const Signup = () => {
     [values.industry, values.company]
   );
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendIn]);
+
   const handleStepOne = () => {
-    if (!values.email || !values.password) {
-      toast.error("Enter your email and a password to continue.");
-      return;
-    }
-    if (issues.length > 0) {
-      toast.error(`Password needs ${issues.join(", ")}.`);
+    setError(null);
+    if (!values.email || !/^\S+@\S+\.\S+$/.test(values.email)) {
+      toast.error("Please enter a valid email address.");
       return;
     }
     setStep(2);
   };
 
-  const onSubmit = async (data: FormValues) => {
-    if (!data.termsAccepted) {
-      toast.error("Please accept the Terms to continue.");
-      return;
+  const sendCode = async (resend = false) => {
+    setError(null);
+    const data = form.getValues();
+    if (!resend) {
+      if (!data.termsAccepted) {
+        toast.error("Please accept the Terms to continue.");
+        return;
+      }
+      if (!data.company || !data.size || !data.industry) {
+        toast.error("Please complete every field to launch your agent.");
+        return;
+      }
     }
-    if (!data.company || !data.size || !data.industry) {
-      toast.error("Please complete every field to launch your agent.");
-      return;
-    }
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const { error: signUpError, data: authData } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: { data: { full_name: "" } },
+      const { error } = await supabase.auth.signInWithOtp({
+        email: data.email.trim().toLowerCase(),
+        options: {
+          shouldCreateUser: true,
+          data: {
+            full_name: "",
+            company: data.company,
+          },
+        },
       });
-      if (signUpError) {
-        if (signUpError.message.includes("already registered")) {
-          toast.error("This email is already registered. Please sign in instead.");
-          return;
-        }
-        throw signUpError;
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      setStep(3);
+      setResendIn(30);
+      if (resend) toast.success("New code sent.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyAndProvision = async (token: string) => {
+    setError(null);
+    setVerifying(true);
+    const data = form.getValues();
+    try {
+      const { data: verifyData, error: verifyError } =
+        await supabase.auth.verifyOtp({
+          email: data.email.trim().toLowerCase(),
+          token,
+          type: "email",
+        });
+      if (verifyError) {
+        setError("Invalid or expired code. Please try again.");
+        setCode("");
+        return;
       }
 
-      const userId = authData.user?.id;
+      const userId = verifyData.user?.id;
       if (userId) {
         await Promise.all([
           supabase.from("organizations").insert({
@@ -129,7 +164,9 @@ const Signup = () => {
               industry: data.industry,
               use_case: data.useCase,
               marketing_consent: data.marketingConsent,
-              marketing_consent_at: data.marketingConsent ? new Date().toISOString() : null,
+              marketing_consent_at: data.marketingConsent
+                ? new Date().toISOString()
+                : null,
               terms_accepted_at: new Date().toISOString(),
             })
             .eq("id", userId),
@@ -140,7 +177,6 @@ const Signup = () => {
         (window as any).fbq("track", "CompleteRegistration");
       }
 
-      // Fire-and-forget welcome email (idempotent on user id)
       if (userId) {
         supabase.functions
           .invoke("send-transactional-email", {
@@ -156,12 +192,11 @@ const Signup = () => {
 
       toast.success("Welcome to Ringster — let's launch your agent.");
       navigate("/onboarding");
-
-    } catch (error: any) {
-      console.error("Signup error:", error);
-      toast.error(error?.message || "Failed to create account. Please try again.");
+    } catch (e: any) {
+      console.error("Signup verify error:", e);
+      toast.error(e?.message || "Failed to create account. Please try again.");
     } finally {
-      setIsLoading(false);
+      setVerifying(false);
     }
   };
 
@@ -172,14 +207,12 @@ const Signup = () => {
         description="Create your Ringster account and launch an AI voice agent that answers calls and books appointments 24/7. 60 free credits, no credit card."
       />
 
-      {/* Ambient gradients */}
       <div className="pointer-events-none absolute inset-0 -z-0">
         <div className="absolute -top-40 left-1/3 h-[640px] w-[900px] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-[160px]" />
         <div className="absolute bottom-0 right-0 h-[420px] w-[640px] rounded-full bg-indigo-500/15 blur-[140px]" />
       </div>
 
       <div className="relative z-10 mx-auto grid min-h-screen max-w-7xl grid-cols-1 lg:grid-cols-2">
-        {/* Left – Form */}
         <div className="flex flex-col px-6 py-10 sm:px-10 lg:py-14">
           <div className="mb-10 flex items-center gap-2 text-sm font-medium tracking-wide text-white/80">
             <Sparkles className="h-4 w-4 text-indigo-300" />
@@ -188,193 +221,239 @@ const Signup = () => {
 
           <div className="mx-auto w-full max-w-md flex-1">
             <div className="mb-2 flex items-center gap-3 text-xs text-white/40">
-              <span className={step === 1 ? "text-white" : ""}>1 · Account</span>
+              <span className={step === 1 ? "text-white" : ""}>1 · Email</span>
               <span className="h-px w-6 bg-white/15" />
-              <span className={step === 2 ? "text-white" : ""}>2 · Your business</span>
+              <span className={step === 2 ? "text-white" : ""}>2 · Business</span>
+              <span className="h-px w-6 bg-white/15" />
+              <span className={step === 3 ? "text-white" : ""}>3 · Verify</span>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              {step === 1 ? "Create your account" : "Tell us about your business"}
+              {step === 1
+                ? "Create your account"
+                : step === 2
+                ? "Tell us about your business"
+                : "Check your email"}
             </h1>
             <p className="mt-2 text-sm text-white/60">
               {step === 1
-                ? "Start in seconds. 60 free credits, no credit card."
-                : "We'll tailor your AI agent to fit how you work."}
+                ? "Start in seconds with a one-time code. 60 free credits, no credit card."
+                : step === 2
+                ? "We'll tailor your AI agent to fit how you work."
+                : (
+                  <>We sent a 6-digit code to{" "}
+                    <span className="text-white/90">{values.email}</span>
+                  </>
+                )}
             </p>
 
-            <form onSubmit={form.handleSubmit(onSubmit)} className="mt-8 space-y-6">
-              {step === 1 ? (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-white/80">Email</Label>
-                    <Input
-                      type="email"
-                      autoComplete="email"
-                      {...form.register("email", { required: true })}
-                      className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
-                      placeholder="you@company.com"
-                    />
-                  </div>
+            {error && (
+              <Alert
+                variant="destructive"
+                className="mt-6 bg-red-500/10 border-red-500/20 text-red-200"
+              >
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-                  <div className="space-y-2">
-                    <Label className="text-white/80">Password</Label>
-                    <Input
-                      type="password"
-                      autoComplete="new-password"
-                      {...form.register("password", { required: true })}
-                      className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
-                      placeholder="At least 6 characters"
-                    />
-                    {values.password && (
-                      <div className="mt-2 space-y-2">
-                        <div className="flex h-1 gap-1">
-                          {[0, 1, 2, 3].map((i) => (
-                            <div
-                              key={i}
-                              className={`h-full flex-1 rounded-full transition-colors ${
-                                i < score
-                                  ? score < 2
-                                    ? "bg-red-400/70"
-                                    : score < 3
-                                    ? "bg-amber-300/70"
-                                    : "bg-emerald-400/70"
-                                  : "bg-white/10"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        {issues.length > 0 ? (
-                          <p className="text-xs text-white/40">Needs {issues.join(", ")}.</p>
-                        ) : (
-                          <p className="text-xs text-emerald-300/80">Looks strong.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
+            {step === 1 && (
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleStepOne(); }}
+                className="mt-8 space-y-6"
+              >
+                <div className="space-y-2">
+                  <Label className="text-white/80">Email</Label>
+                  <Input
+                    type="email"
+                    autoComplete="email"
+                    {...form.register("email", { required: true })}
+                    className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
+                    placeholder="you@company.com"
+                  />
+                </div>
+                <Button type="submit" size="lg" className="w-full">
+                  Continue <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <p className="text-center text-sm text-white/50">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    className="text-indigo-300 hover:underline"
+                    onClick={() => navigate("/login")}
+                  >
+                    Sign in
+                  </button>
+                </p>
+              </form>
+            )}
 
+            {step === 2 && (
+              <form
+                onSubmit={(e) => { e.preventDefault(); sendCode(); }}
+                className="mt-8 space-y-6"
+              >
+                <div className="space-y-2">
+                  <Label className="text-white/80">Company name</Label>
+                  <Input
+                    {...form.register("company", { required: true })}
+                    className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
+                    placeholder="Acme Plumbing"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-white/80">Industry</Label>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {INDUSTRIES.map((i) => (
+                      <button
+                        key={i.key}
+                        type="button"
+                        onClick={() => form.setValue("industry", i.key)}
+                        className={`rounded-xl border px-3 py-2 text-sm transition-all ${
+                          values.industry === i.key
+                            ? "border-indigo-400 bg-indigo-500/15 text-white"
+                            : "border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:text-white"
+                        }`}
+                      >
+                        {i.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="text-white/80">Team size</Label>
+                    <Select onValueChange={(v) => form.setValue("size", v)} value={values.size}>
+                      <SelectTrigger className="border-white/10 bg-white/5 text-white">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ORGANIZATION_SIZES.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white/80">Primary use</Label>
+                    <Select
+                      onValueChange={(v) => form.setValue("useCase", v)}
+                      value={values.useCase}
+                    >
+                      <SelectTrigger className="border-white/10 bg-white/5 text-white">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {USE_CASES.map((u) => (
+                          <SelectItem key={u.key} value={u.key}>{u.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  <label className="flex items-start gap-2 text-sm text-white/70">
+                    <input
+                      type="checkbox"
+                      {...form.register("termsAccepted")}
+                      className="mt-1 h-4 w-4 rounded border-white/20 bg-white/5"
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <a href="/terms" target="_blank" className="text-indigo-300 hover:underline">Terms</a>
+                      {" "}and{" "}
+                      <a href="/privacy" target="_blank" className="text-indigo-300 hover:underline">Privacy Policy</a>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm text-white/60">
+                    <input
+                      type="checkbox"
+                      {...form.register("marketingConsent")}
+                      className="mt-1 h-4 w-4 rounded border-white/20 bg-white/5"
+                    />
+                    <span>Send me occasional product updates (optional)</span>
+                  </label>
+                </div>
+
+                <div className="flex gap-3">
                   <Button
                     type="button"
-                    size="lg"
-                    onClick={handleStepOne}
-                    className="w-full"
+                    variant="ghost"
+                    onClick={() => setStep(1)}
+                    className="text-white/60 hover:text-white"
                   >
-                    Continue <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
                   </Button>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-white/80">Company name</Label>
-                    <Input
-                      {...form.register("company", { required: true })}
-                      className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
-                      placeholder="Acme Plumbing"
-                    />
-                  </div>
+                  <Button type="submit" size="lg" disabled={isLoading} className="flex-1">
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Mail className="mr-2 h-4 w-4" />
+                    Send verification code
+                  </Button>
+                </div>
+              </form>
+            )}
 
-                  <div className="space-y-2">
-                    <Label className="text-white/80">Industry</Label>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {INDUSTRIES.map((i) => (
-                        <button
-                          key={i.key}
-                          type="button"
-                          onClick={() => form.setValue("industry", i.key)}
-                          className={`rounded-xl border px-3 py-2 text-sm transition-all ${
-                            values.industry === i.key
-                              ? "border-indigo-400 bg-indigo-500/15 text-white"
-                              : "border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:text-white"
-                          }`}
-                        >
-                          {i.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label className="text-white/80">Team size</Label>
-                      <Select onValueChange={(v) => form.setValue("size", v)} value={values.size}>
-                        <SelectTrigger className="border-white/10 bg-white/5 text-white">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ORGANIZATION_SIZES.map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white/80">Primary use</Label>
-                      <Select
-                        onValueChange={(v) => form.setValue("useCase", v)}
-                        value={values.useCase}
-                      >
-                        <SelectTrigger className="border-white/10 bg-white/5 text-white">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {USE_CASES.map((u) => (
-                            <SelectItem key={u.key} value={u.key}>{u.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 pt-1">
-                    <label className="flex items-start gap-2 text-sm text-white/70">
-                      <input
-                        type="checkbox"
-                        {...form.register("termsAccepted")}
-                        className="mt-1 h-4 w-4 rounded border-white/20 bg-white/5"
-                      />
-                      <span>
-                        I agree to the{" "}
-                        <a href="/terms" target="_blank" className="text-indigo-300 hover:underline">Terms</a>
-                        {" "}and{" "}
-                        <a href="/privacy" target="_blank" className="text-indigo-300 hover:underline">Privacy Policy</a>
-                      </span>
-                    </label>
-                    <label className="flex items-start gap-2 text-sm text-white/60">
-                      <input
-                        type="checkbox"
-                        {...form.register("marketingConsent")}
-                        className="mt-1 h-4 w-4 rounded border-white/20 bg-white/5"
-                      />
-                      <span>Send me occasional product updates (optional)</span>
-                    </label>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setStep(1)}
-                      className="text-white/60 hover:text-white"
+            {step === 3 && (
+              <div className="mt-8 space-y-6">
+                <div className="space-y-3">
+                  <Label className="text-white/80">Enter 6-digit code</Label>
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={code}
+                      onChange={(v) => {
+                        setCode(v);
+                        if (v.length === 6) {
+                          setTimeout(() => verifyAndProvision(v), 0);
+                        }
+                      }}
                     >
-                      <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                    <Button type="submit" size="lg" disabled={isLoading} className="flex-1">
-                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Launch my agent <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                      </InputOTPGroup>
+                      <InputOTPSeparator />
+                      <InputOTPGroup>
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
                   </div>
-                </>
-              )}
+                </div>
 
-              <p className="text-center text-sm text-white/50">
-                Already have an account?{" "}
-                <button
+                <Button
                   type="button"
-                  className="text-indigo-300 hover:underline"
-                  onClick={() => navigate("/login")}
+                  size="lg"
+                  className="w-full"
+                  disabled={verifying || code.length !== 6}
+                  onClick={() => verifyAndProvision(code)}
                 >
-                  Sign in
-                </button>
-              </p>
-            </form>
+                  {verifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Verify & launch my agent <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={() => { setStep(2); setCode(""); setError(null); }}
+                    className="flex items-center gap-1 text-white/60 hover:text-white"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" /> Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={resendIn > 0 || isLoading}
+                    onClick={() => sendCode(true)}
+                    className="text-indigo-300 hover:underline disabled:text-white/30 disabled:no-underline"
+                  >
+                    {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mx-auto mt-10 flex w-full max-w-md flex-wrap items-center gap-x-4 gap-y-2 text-[11px] uppercase tracking-widest text-white/40">
@@ -385,7 +464,6 @@ const Signup = () => {
           </div>
         </div>
 
-        {/* Right – Preview */}
         <div className="hidden lg:flex relative items-center justify-center border-l border-white/5 px-10">
           <div className="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-900/20 via-transparent to-transparent" />
 
