@@ -1,74 +1,98 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AuthError, AuthApiError } from "@supabase/supabase-js";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { Seo } from "@/components/seo/Seo";
-import { Sparkles, ShieldCheck, PhoneCall, Check } from "lucide-react";
+import { Sparkles, ShieldCheck, PhoneCall, Check, Loader2, ArrowLeft, Mail } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        setError(getErrorMessage(sessionError));
-      }
-      if (session) {
-        navigate("/dashboard", { replace: true });
-      }
-      setIsLoading(false);
-    };
-
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        navigate("/dashboard", { replace: true });
-      }
-      if (event === 'SIGNED_OUT') {
-        setError(null);
-      }
-      if (event === 'USER_UPDATED' && !session) {
-        const checkError = async () => {
-          const { error: authError } = await supabase.auth.getSession();
-          if (authError) {
-            setError(getErrorMessage(authError));
-          }
-        };
-        checkError();
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate("/dashboard", { replace: true });
+      setCheckingSession(false);
     });
-
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) navigate("/dashboard", { replace: true });
+    });
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const getErrorMessage = (error: AuthError) => {
-    if (error instanceof AuthApiError) {
-      switch (error.status) {
-        case 400:
-          if (error.message.includes('Invalid login credentials')) {
-            return 'Invalid email or password. Please check your credentials and try again.';
-          }
-          if (error.message.includes('Email not confirmed')) {
-            return 'Please verify your email address before signing in.';
-          }
-          break;
-        case 422:
-          return 'Invalid email format. Please check your email address.';
-        case 429:
-          return 'Too many login attempts. Please try again later.';
-      }
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendIn]);
+
+  const sendCode = async (resend = false) => {
+    setError(null);
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setError("Please enter a valid email address.");
+      return;
     }
-    return error.message;
+    setSending(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
+        options: { shouldCreateUser: false },
+      });
+      if (error) {
+        if (error.message.toLowerCase().includes("signups not allowed")) {
+          setError("No account found for this email. Please sign up first.");
+        } else {
+          setError(error.message);
+        }
+        return;
+      }
+      setStep("code");
+      setResendIn(30);
+      if (resend) toast.success("New code sent.");
+    } finally {
+      setSending(false);
+    }
   };
 
-  if (isLoading) {
+  const verifyCode = async () => {
+    setError(null);
+    if (code.length !== 6) return;
+    setVerifying(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: code,
+        type: "email",
+      });
+      if (error) {
+        setError("Invalid or expired code. Please try again.");
+        setCode("");
+        return;
+      }
+      // onAuthStateChange will navigate
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  if (checkingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0a0a1a]">
         <div className="animate-pulse text-white/60">Loading...</div>
@@ -83,14 +107,12 @@ export default function Login() {
         description="Log in to Ringster to manage your AI voice receptionist, agents, call logs, and subscription in one place."
       />
 
-      {/* Ambient gradients */}
       <div className="pointer-events-none absolute inset-0 -z-0">
         <div className="absolute -top-40 left-1/3 h-[640px] w-[900px] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-[160px]" />
         <div className="absolute bottom-0 right-0 h-[420px] w-[640px] rounded-full bg-indigo-500/15 blur-[140px]" />
       </div>
 
       <div className="relative z-10 mx-auto grid min-h-screen max-w-7xl grid-cols-1 lg:grid-cols-2">
-        {/* Left – Form */}
         <div className="flex flex-col px-6 py-10 sm:px-10 lg:py-14">
           <div className="mb-10 flex items-center gap-2 text-sm font-medium tracking-wide text-white/80">
             <Sparkles className="h-4 w-4 text-indigo-300" />
@@ -99,10 +121,14 @@ export default function Login() {
 
           <div className="mx-auto w-full max-w-md flex-1">
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Welcome back
+              {step === "email" ? "Welcome back" : "Check your email"}
             </h1>
             <p className="mt-2 text-sm text-white/60">
-              Sign in to manage your AI agents and subscription.
+              {step === "email"
+                ? "Sign in with a one-time code — no password needed."
+                : (
+                  <>We sent a 6-digit code to <span className="text-white/90">{email}</span></>
+                )}
             </p>
 
             <div className="mt-8">
@@ -112,71 +138,106 @@ export default function Login() {
                 </Alert>
               )}
 
-              {/* Auth UI dark overrides */}
-              <style>{`
-                .auth-container {
-                  --colors-brand: #6366f1;
-                  --colors-brandAccent: #4f46e5;
-                  --colors-inputText: #ffffff;
-                  --colors-inputBackground: rgba(255,255,255,0.05);
-                  --colors-inputBorder: rgba(255,255,255,0.1);
-                  --colors-inputBorderHover: rgba(255,255,255,0.2);
-                  --colors-inputBorderFocus: #6366f1;
-                  --colors-messageText: #ffffff;
-                  --colors-messageTextDanger: #fca5a5;
-                  --colors-anchorTextColor: #a5b4fc;
-                  --colors-defaultButtonBackground: rgba(255,255,255,0.05);
-                  --colors-defaultButtonBackgroundHover: rgba(255,255,255,0.1);
-                  --colors-defaultButtonBorder: rgba(255,255,255,0.1);
-                  --colors-defaultButtonText: #ffffff;
-                  --colors-dividerBackground: rgba(255,255,255,0.1);
-                  --colors-labelText: rgba(255,255,255,0.7);
-                }
-                .auth-container input {
-                  background: rgba(255,255,255,0.05) !important;
-                  border-color: rgba(255,255,255,0.1) !important;
-                  color: #ffffff !important;
-                  border-radius: 0.5rem !important;
-                }
-                .auth-container input::placeholder {
-                  color: rgba(255,255,255,0.3) !important;
-                }
-                .auth-container button[type="submit"] {
-                  background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
-                  border: none !important;
-                  border-radius: 0.5rem !important;
-                  color: #ffffff !important;
-                  font-weight: 500 !important;
-                }
-                .auth-container button[type="submit"]:hover {
-                  opacity: 0.9 !important;
-                }
-                .auth-container a {
-                  color: #a5b4fc !important;
-                }
-                .auth-container label {
-                  color: rgba(255,255,255,0.7) !important;
-                }
-              `}</style>
+              {step === "email" ? (
+                <form
+                  onSubmit={(e) => { e.preventDefault(); sendCode(); }}
+                  className="space-y-5"
+                >
+                  <div className="space-y-2">
+                    <Label className="text-white/80">Email</Label>
+                    <Input
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="border-white/10 bg-white/5 text-white placeholder:text-white/30"
+                      placeholder="you@company.com"
+                      required
+                    />
+                  </div>
+                  <Button type="submit" size="lg" className="w-full" disabled={sending}>
+                    {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Mail className="mr-2 h-4 w-4" />
+                    Send sign-in code
+                  </Button>
+                </form>
+              ) : (
+                <div className="space-y-5">
+                  <div className="space-y-3">
+                    <Label className="text-white/80">Enter 6-digit code</Label>
+                    <div className="flex justify-center">
+                      <InputOTP
+                        maxLength={6}
+                        value={code}
+                        onChange={(v) => {
+                          setCode(v);
+                          if (v.length === 6) {
+                            // auto-submit
+                            setTimeout(() => {
+                              // use latest value via closure
+                              (async () => {
+                                setVerifying(true);
+                                setError(null);
+                                const { error } = await supabase.auth.verifyOtp({
+                                  email: email.trim().toLowerCase(),
+                                  token: v,
+                                  type: "email",
+                                });
+                                if (error) {
+                                  setError("Invalid or expired code. Please try again.");
+                                  setCode("");
+                                }
+                                setVerifying(false);
+                              })();
+                            }, 0);
+                          }
+                        }}
+                      >
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                        </InputOTPGroup>
+                        <InputOTPSeparator />
+                        <InputOTPGroup>
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                  </div>
 
-              <div className="auth-container">
-                <Auth
-                  supabaseClient={supabase}
-                  appearance={{
-                    theme: ThemeSupa,
-                    variables: {
-                      default: {
-                        colors: {
-                          brand: '#6366f1',
-                          brandAccent: '#4f46e5',
-                        },
-                      },
-                    },
-                  }}
-                  theme="dark"
-                  providers={[]}
-                />
-              </div>
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="w-full"
+                    disabled={verifying || code.length !== 6}
+                    onClick={verifyCode}
+                  >
+                    {verifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Verify & sign in
+                  </Button>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <button
+                      type="button"
+                      onClick={() => { setStep("email"); setCode(""); setError(null); }}
+                      className="flex items-center gap-1 text-white/60 hover:text-white"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" /> Change email
+                    </button>
+                    <button
+                      type="button"
+                      disabled={resendIn > 0 || sending}
+                      onClick={() => sendCode(true)}
+                      className="text-indigo-300 hover:underline disabled:text-white/30 disabled:no-underline"
+                    >
+                      {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <p className="mt-6 text-center text-sm text-white/50">
                 Don't have an account?{" "}
@@ -199,10 +260,8 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Right – Visual */}
         <div className="hidden lg:flex relative items-center justify-center border-l border-white/5 px-10">
           <div className="absolute inset-0 -z-10 bg-gradient-to-br from-indigo-900/20 via-transparent to-transparent" />
-
           <div className="w-full max-w-md">
             <p className="mb-4 text-[11px] uppercase tracking-[0.18em] text-white/40">
               Your AI voice agent
