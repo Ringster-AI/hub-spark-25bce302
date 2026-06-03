@@ -4,6 +4,8 @@ import { useSubscriptionFeatures } from "@/hooks/useSubscriptionFeatures";
 import { useToast } from "@/hooks/use-toast";
 import { AgentConfig } from "@/types/database/agents";
 import Vapi from "@vapi-ai/web";
+
+let activeVapi: Vapi | null = null;
 import { EditAgentDialog } from "./EditAgentDialog";
 import { AgentTrialWarning } from "./AgentTrialWarning";
 import { AgentHeader } from "./AgentHeader";
