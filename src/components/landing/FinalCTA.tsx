@@ -25,7 +25,7 @@ export const FinalCTA = () => {
             <span className="block mt-2 text-white/80">Start winning them with Ringster.</span>
           </h2>
 
-          <p className="text-lg text-slate-400 max-w-2xl mx-auto mb-8">
+          <p className="text-lg text-slate-200 max-w-2xl mx-auto mb-8">
             Join hundreds of small business owners who've stopped playing phone tag and started capturing every opportunity.
           </p>
 
@@ -71,7 +71,7 @@ export const FinalCTA = () => {
             />
           </div>
 
-          <p className="mt-8 text-sm text-slate-500">
+          <p className="mt-8 text-sm text-slate-300">
             Questions? Call us at (620) 445-8363 or email support@ringster.ai
           </p>
         </div>

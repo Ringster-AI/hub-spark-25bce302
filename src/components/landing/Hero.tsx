@@ -55,7 +55,7 @@ export const Hero = () => {
           </h1>
 
           {/* Subheadline */}
-          <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-8 animate-fade-in">
+          <p className="text-lg sm:text-xl text-slate-200 max-w-2xl mx-auto mb-8 animate-fade-in">
             Stop letting voicemail eat your leads. Your AI receptionist handles calls 24/7—no hiring, no training, no being glued to your phone.
           </p>
 
@@ -103,7 +103,7 @@ export const Hero = () => {
           </div>
 
           {/* Social proof */}
-          <p className="mt-8 text-sm text-slate-500 animate-fade-in">
+          <p className="mt-8 text-sm text-slate-300 animate-fade-in">
             Trusted by 200+ service businesses • No credit card required
           </p>
         </div>
