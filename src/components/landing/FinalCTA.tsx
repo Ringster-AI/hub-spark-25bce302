@@ -71,7 +71,7 @@ export const FinalCTA = () => {
             />
           </div>
 
-          <p className="mt-8 text-sm text-slate-500">
+          <p className="mt-8 text-sm text-slate-300">
             Questions? Call us at (620) 445-8363 or email support@ringster.ai
           </p>
         </div>
