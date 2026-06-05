@@ -55,7 +55,7 @@ export const Hero = () => {
           </h1>
 
           {/* Subheadline */}
-          <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-8 animate-fade-in">
+          <p className="text-lg sm:text-xl text-slate-200 max-w-2xl mx-auto mb-8 animate-fade-in">
             Stop letting voicemail eat your leads. Your AI receptionist handles calls 24/7—no hiring, no training, no being glued to your phone.
           </p>
 
