@@ -103,7 +103,7 @@ export const Hero = () => {
           </div>
 
           {/* Social proof */}
-          <p className="mt-8 text-sm text-slate-500 animate-fade-in">
+          <p className="mt-8 text-sm text-slate-300 animate-fade-in">
             Trusted by 200+ service businesses • No credit card required
           </p>
         </div>
