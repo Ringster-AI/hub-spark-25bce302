@@ -1,13 +1,19 @@
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CallRecording } from "./types";
 
-export const useRecordings = () => {
+export const RECORDINGS_PAGE_SIZE = 25;
+
+export const useRecordings = (page: number = 0, pageSize: number = RECORDINGS_PAGE_SIZE) => {
   return useQuery({
-    queryKey: ['recordings'],
+    queryKey: ['recordings', page, pageSize],
+    placeholderData: keepPreviousData,
     queryFn: async () => {
-      // Step 1: fetch recordings with explicit FK alias to avoid duplicate-FK ambiguity
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      // Step 1: fetch recordings (paginated, explicit columns) with FK alias.
       const { data: recordings, error } = await supabase
         .from('call_recordings')
         .select(`
@@ -26,12 +32,13 @@ export const useRecordings = () => {
             agent_id
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
       if (!recordings) return [];
 
-      // Step 2: hydrate agent names in a separate query (no declared FK relationship in types)
+      // Step 2: hydrate agent names with a single secondary query.
       const agentIds = Array.from(
         new Set(
           recordings

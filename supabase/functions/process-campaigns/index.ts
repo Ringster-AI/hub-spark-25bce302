@@ -67,87 +67,96 @@ Deno.serve(async (req) => {
       );
     }
 
-    let totalProcessed = 0;
+    // Process campaigns in parallel (each campaign is independent).
+    const campaignResults = await Promise.all(
+      campaigns.map(async (campaign) => {
+        console.log(`Processing campaign: ${campaign.name} (${campaign.id})`);
 
-    for (const campaign of campaigns) {
-      console.log(`Processing campaign: ${campaign.name} (${campaign.id})`);
-
-      // Update scheduled campaigns to running
-      if (campaign.status === 'scheduled') {
-        await supabase
-          .from('campaigns')
-          .update({ status: 'running' })
-          .eq('id', campaign.id);
-        
-        console.log(`Campaign ${campaign.id} updated to running status`);
-      }
-
-      // Get pending contacts for this campaign
-      const { data: contacts, error: contactsError } = await supabase
-        .from('campaign_contacts')
-        .select('*')
-        .eq('campaign_id', campaign.id)
-        .eq('status', 'pending')
-        .lt('call_attempts', 3)
-        .or('last_call_at.is.null,last_call_at.lte.' + new Date(Date.now() - 60 * 60 * 1000).toISOString())
-        .limit(5); // Process 5 contacts at a time
-
-      if (contactsError) {
-        console.error(`Error fetching contacts for campaign ${campaign.id}:`, contactsError);
-        continue;
-      }
-
-      if (!contacts || contacts.length === 0) {
-        console.log(`No contacts to process for campaign ${campaign.id}`);
-        continue;
-      }
-
-      // Check business hours
-      const config = campaign.config || {};
-      const businessHours = config.businessHours || {
-        start: '09:00',
-        end: '17:00',
-        timezone: 'America/New_York',
-        days: [1, 2, 3, 4, 5]
-      };
-
-      if (!isWithinBusinessHours(businessHours)) {
-        console.log(`Outside business hours for campaign ${campaign.id}, skipping`);
-        continue;
-      }
-
-      // Process contacts
-      for (const contact of contacts) {
-        try {
-          const success = await makeOutboundCall(campaign, contact);
-          
-          // Update contact status
+        // Update scheduled campaigns to running
+        if (campaign.status === 'scheduled') {
           await supabase
-            .from('campaign_contacts')
-            .update({
-              status: success ? 'called' : 'pending',
-              call_attempts: contact.call_attempts + 1,
-              last_call_at: new Date().toISOString()
-            })
-            .eq('id', contact.id);
-
-          totalProcessed++;
-          console.log(`Processed contact ${contact.id}: ${success ? 'success' : 'failed'}`);
-
-        } catch (error) {
-          console.error(`Failed to process contact ${contact.id}:`, error);
-          
-          // Update with failure
-          await supabase
-            .from('campaign_contacts')
-            .update({
-              call_attempts: contact.call_attempts + 1,
-              last_call_at: new Date().toISOString()
-            })
-            .eq('id', contact.id);
+            .from('campaigns')
+            .update({ status: 'running' })
+            .eq('id', campaign.id);
+          console.log(`Campaign ${campaign.id} updated to running status`);
         }
-      }
-    }
+
+        // Pull a larger batch now that contacts are processed concurrently.
+        const { data: contacts, error: contactsError } = await supabase
+          .from('campaign_contacts')
+          .select('*')
+          .eq('campaign_id', campaign.id)
+          .eq('status', 'pending')
+          .lt('call_attempts', 3)
+          .or('last_call_at.is.null,last_call_at.lte.' + new Date(Date.now() - 60 * 60 * 1000).toISOString())
+          .limit(50);
+
+        if (contactsError) {
+          console.error(`Error fetching contacts for campaign ${campaign.id}:`, contactsError);
+          return 0;
+        }
+
+        if (!contacts || contacts.length === 0) {
+          console.log(`No contacts to process for campaign ${campaign.id}`);
+          return 0;
+        }
+
+        const config = campaign.config || {};
+        const businessHours = config.businessHours || {
+          start: '09:00',
+          end: '17:00',
+          timezone: 'America/New_York',
+          days: [1, 2, 3, 4, 5]
+        };
+
+        if (!isWithinBusinessHours(businessHours)) {
+          console.log(`Outside business hours for campaign ${campaign.id}, skipping`);
+          return 0;
+        }
+
+        // Bounded concurrency across contacts within a single campaign.
+        const CONCURRENCY = 5;
+        let cursor = 0;
+        let processed = 0;
+
+        const worker = async () => {
+          while (cursor < contacts.length) {
+            const idx = cursor++;
+            const contact = contacts[idx];
+            try {
+              const success = await makeOutboundCall(campaign, contact);
+              await supabase
+                .from('campaign_contacts')
+                .update({
+                  status: success ? 'called' : 'pending',
+                  call_attempts: contact.call_attempts + 1,
+                  last_call_at: new Date().toISOString()
+                })
+                .eq('id', contact.id);
+              processed++;
+              console.log(`Processed contact ${contact.id}: ${success ? 'success' : 'failed'}`);
+            } catch (error) {
+              console.error(`Failed to process contact ${contact.id}:`, error);
+              await supabase
+                .from('campaign_contacts')
+                .update({
+                  call_attempts: contact.call_attempts + 1,
+                  last_call_at: new Date().toISOString()
+                })
+                .eq('id', contact.id);
+            }
+          }
+        };
+
+        await Promise.all(
+          Array.from({ length: Math.min(CONCURRENCY, contacts.length) }, () => worker())
+        );
+
+        return processed;
+      })
+    );
+
+    const totalProcessed = campaignResults.reduce((a, b) => a + b, 0);
 
     console.log(`Campaign processing complete. Total processed: ${totalProcessed}`);
 

@@ -1,15 +1,18 @@
 
 import { useState } from "react";
-import { useRecordings } from "./recordings/useRecordings";
+import { useRecordings, RECORDINGS_PAGE_SIZE } from "./recordings/useRecordings";
 import { RecordingsTable } from "./recordings/RecordingsTable";
 import { RecordingDetails } from "./recordings/RecordingDetails";
 import { CallRecording } from "./recordings/types";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
 
 const Recordings = () => {
   const [selectedRecording, setSelectedRecording] = useState<CallRecording | null>(null);
-  const { data: recordings, isLoading, error } = useRecordings();
+  const [page, setPage] = useState(0);
+  const { data: recordings, isLoading, error, isFetching } = useRecordings(page);
   const isMobile = useIsMobile();
+  const pageFull = (recordings?.length ?? 0) === RECORDINGS_PAGE_SIZE;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -29,6 +32,29 @@ const Recordings = () => {
               }
             }}
           />
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-sm text-muted-foreground">
+              Page {page + 1}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0 || isFetching}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!pageFull || isFetching}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
 
         {(selectedRecording || !isMobile) && (
