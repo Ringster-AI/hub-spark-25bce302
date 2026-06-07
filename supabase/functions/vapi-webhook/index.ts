@@ -98,17 +98,28 @@ Deno.serve(async (req) => {
     const callerNumber = call.customer?.number ?? call.from ?? null;
     const callerName = call.customer?.name ?? null;
 
+    // Vapi exposes the live listen websocket at call.monitor.listenUrl.
+    // Capture it as soon as it appears so mobile clients can stream the call.
+    const listenUrl: string | null =
+      call?.monitor?.listenUrl ??
+      message?.monitor?.listenUrl ??
+      message?.call?.monitor?.listenUrl ??
+      null;
+
+    const upsertRow: Record<string, unknown> = {
+      user_id: userId,
+      agent_id: agentId,
+      vapi_call_id: vapiCallId,
+      caller_number: callerNumber,
+      caller_name: callerName,
+      status: safeStatus,
+      updated_at: new Date().toISOString(),
+    };
+    if (listenUrl) upsertRow.stream_url = listenUrl;
+
     const { data: ac, error: acErr } = await admin
       .from("active_calls")
-      .upsert({
-        user_id: userId,
-        agent_id: agentId,
-        vapi_call_id: vapiCallId,
-        caller_number: callerNumber,
-        caller_name: callerName,
-        status: safeStatus,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "vapi_call_id" })
+      .upsert(upsertRow, { onConflict: "vapi_call_id" })
       .select("id")
       .single();
 
@@ -129,7 +140,7 @@ Deno.serve(async (req) => {
               owner_user_id: userId,
               title: "Incoming call",
               body: callerName ? `${callerName} · ${callerNumber ?? ""}` : (callerNumber ?? "New call"),
-              data: { active_call_id: ac.id, vapi_call_id: vapiCallId },
+              data: { active_call_id: ac.id, vapi_call_id: vapiCallId, listen_url: listenUrl ?? null },
             },
           });
         } catch (e) {
