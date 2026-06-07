@@ -32,6 +32,29 @@ const Recordings = () => {
               }
             }}
           />
+          <div className="flex items-center justify-between mt-4">
+            <span className="text-sm text-muted-foreground">
+              Page {page + 1}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0 || isFetching}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!pageFull || isFetching}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
 
         {(selectedRecording || !isMobile) && (
