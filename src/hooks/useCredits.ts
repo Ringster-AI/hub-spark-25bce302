@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreditsService } from "@/services/creditsService";
 import { CreditStatus } from "@/types/credits";
+import { supabase } from "@/integrations/supabase/client";
 
 export const useCredits = () => {
   const queryClient = useQueryClient();
@@ -8,9 +10,44 @@ export const useCredits = () => {
   const { data: creditStatus, isLoading, error } = useQuery({
     queryKey: ["credits"],
     queryFn: () => CreditsService.getCreditStatus(),
-    refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 10000, // Consider data stale after 10 seconds
+    // Realtime subscription below replaces the previous 30s polling.
+    staleTime: 10000,
   });
+
+  // Subscribe to user_credits changes for the current user and invalidate the
+  // query (and notify other listeners) on every change. This eliminates the
+  // 30s poll fan-out at scale.
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
+
+      channel = supabase
+        .channel(`user_credits:${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "user_credits",
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ["credits"] });
+            window.dispatchEvent(new Event("credits:refresh"));
+          }
+        )
+        .subscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const deductCredits = async (creditsAmount: number, description?: string, callLogId?: string) => {
     const success = await CreditsService.deductCredits(creditsAmount, description, callLogId);
