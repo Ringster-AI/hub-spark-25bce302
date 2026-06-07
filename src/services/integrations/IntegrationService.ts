@@ -260,13 +260,23 @@ export class IntegrationService {
     };
   }
 
-  static async getIntegrationLogs(integrationId: string): Promise<IntegrationLog[]> {
-    const { data, error } = await supabase
+  static async getIntegrationLogs(
+    integrationId: string,
+    beforeCursor?: string,
+    pageSize: number = 25
+  ): Promise<IntegrationLog[]> {
+    let query = supabase
       .from('integration_logs')
       .select('*')
       .eq('integration_id', integrationId)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(pageSize);
+
+    if (beforeCursor) {
+      query = query.lt('created_at', beforeCursor);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return data.map(item => ({

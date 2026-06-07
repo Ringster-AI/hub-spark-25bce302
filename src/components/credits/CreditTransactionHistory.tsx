@@ -1,29 +1,50 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { History, TrendingDown, TrendingUp, RotateCcw } from "lucide-react";
 import { CreditsService } from "@/services/creditsService";
 import { CreditTransaction } from "@/types/credits";
 
+const PAGE_SIZE = 25;
+
 export const CreditTransactionHistory = () => {
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  const loadPage = useCallback(async (cursor?: string) => {
+    const data = await CreditsService.getCreditTransactions(cursor, PAGE_SIZE);
+    setHasMore(data.length === PAGE_SIZE);
+    return data;
+  }, []);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    (async () => {
       try {
-        const data = await CreditsService.getCreditTransactions();
+        const data = await loadPage();
         setTransactions(data);
       } catch (error) {
         console.error('Error fetching credit transactions:', error);
       } finally {
         setLoading(false);
       }
-    };
+    })();
+  }, [loadPage]);
 
-    fetchTransactions();
-  }, []);
+  const handleLoadMore = async () => {
+    if (transactions.length === 0) return;
+    setLoadingMore(true);
+    try {
+      const cursor = transactions[transactions.length - 1].created_at;
+      const next = await loadPage(cursor);
+      setTransactions((prev) => [...prev, ...next]);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -114,6 +135,13 @@ export const CreditTransactionHistory = () => {
             )}
           </div>
         </ScrollArea>
+        {hasMore && transactions.length > 0 && (
+          <div className="pt-3 flex justify-center">
+            <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore}>
+              {loadingMore ? 'Loading…' : 'Load more'}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
