@@ -1999,6 +1999,16 @@ export type Database = {
         }
         Returns: string
       }
+      get_my_team_access: {
+        Args: never
+        Returns: {
+          can_listen: boolean
+          can_transfer: boolean
+          is_owner: boolean
+          receives_notifications: boolean
+          role: string
+        }[]
+      }
       handle_subscription_update: {
         Args: {
           new_period_end: string
