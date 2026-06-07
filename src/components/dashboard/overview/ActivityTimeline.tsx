@@ -75,13 +75,29 @@ export const ActivityTimeline = () => {
     queryKey: ["recent-activities"],
     queryFn: async () => {
       const activities: Activity[] = [];
-      
-      // Fetch recent call logs
-      const { data: callLogs } = await supabase
-        .from("call_logs")
-        .select("*, agent_configs(name)")
-        .order("created_at", { ascending: false })
-        .limit(5);
+
+      // Run all three queries in parallel
+      const [callLogsRes, campaignsRes, bookingsRes] = await Promise.all([
+        supabase
+          .from("call_logs")
+          .select("*, agent_configs(name)")
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("campaigns")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(3),
+        supabase
+          .from("calendar_bookings")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(3),
+      ]);
+
+      const callLogs = callLogsRes.data;
+      const campaigns = campaignsRes.data;
+      const bookings = bookingsRes.data;
 
       if (callLogs) {
         callLogs.forEach(call => {
@@ -96,13 +112,6 @@ export const ActivityTimeline = () => {
         });
       }
 
-      // Fetch recent campaigns
-      const { data: campaigns } = await supabase
-        .from("campaigns")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(3);
-
       if (campaigns) {
         campaigns.forEach(campaign => {
           activities.push({
@@ -115,13 +124,6 @@ export const ActivityTimeline = () => {
           });
         });
       }
-
-      // Fetch recent bookings
-      const { data: bookings } = await supabase
-        .from("calendar_bookings")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(3);
 
       if (bookings) {
         bookings.forEach(booking => {
@@ -140,6 +142,7 @@ export const ActivityTimeline = () => {
         .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
         .slice(0, 8);
     },
+
     refetchInterval: 30000
   });
 
