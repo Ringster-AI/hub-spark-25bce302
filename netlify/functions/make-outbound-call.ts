@@ -97,7 +97,7 @@ export const handler: Handler = async (event) => {
       phoneNumberId: undefined // Using shared number, no specific SID needed
     };
 
-    console.log('Making outbound call with payload:', JSON.stringify(vapiPayload, null, 2));
+    console.log('Making outbound call with payload:', summarizeForLog(vapiPayload));
 
     // Send POST request to webhook
     const response = await fetch(outboundCallWebhook, {
