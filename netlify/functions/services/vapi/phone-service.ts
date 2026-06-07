@@ -21,10 +21,10 @@ export class VapiPhoneService extends VapiBaseService {
       }
     };
 
-    console.log('Import configuration:', JSON.stringify(config, null, 2));
-    
+    console.log('Import configuration:', summarizeForLog(config));
+
     const data = await this.makeRequest(importUrl, 'POST', config);
-    console.log('Successfully imported Twilio number:', data);
+    console.log('Successfully imported Twilio number id:', (data as any)?.id ?? '[no id]');
     return data;
   }
 }

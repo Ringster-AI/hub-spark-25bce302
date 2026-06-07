@@ -58,10 +58,10 @@ export class VapiToolsService extends VapiBaseService {
       }))
     };
 
-    console.log('Transfer tool configuration:', JSON.stringify(toolConfig, null, 2));
+    console.log('Transfer tool configuration:', summarizeForLog(toolConfig));
 
     const data = await this.makeRequest('https://api.vapi.ai/tool', 'POST', toolConfig);
-    console.log('Successfully created transfer tool:', data);
+    console.log('Successfully created transfer tool id:', (data as any)?.id ?? '[no id]');
     return data;
   }
 }
