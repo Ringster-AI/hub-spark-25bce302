@@ -1,5 +1,7 @@
 
 import { VapiBaseService } from './base-service';
+import { summarizeForLog } from '../../utils/redact';
+
 
 export class VapiToolsService extends VapiBaseService {
   /**

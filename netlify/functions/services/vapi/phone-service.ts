@@ -1,9 +1,11 @@
 
 import { VapiBaseService } from './base-service';
+import { summarizeForLog } from '../../utils/redact';
 
 export class VapiPhoneService extends VapiBaseService {
   async importTwilioNumber(assistantId: string, twilioNumber: string, twilioAccountSid: string, twilioAuthToken: string) {
-    console.log('Importing Twilio number into Vapi:', twilioNumber);
+    console.log('Importing Twilio number into Vapi for assistant:', assistantId);
+
     
     const importUrl = 'https://api.vapi.ai/phone-number';
     console.log('Using import URL:', importUrl);
