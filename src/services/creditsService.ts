@@ -117,14 +117,24 @@ export class CreditsService {
     }
   }
 
-  // Get credit transaction history
-  static async getCreditTransactions(): Promise<CreditTransaction[]> {
+  // Get credit transaction history (cursor-paginated).
+  // Pass the last transaction's `created_at` as `beforeCursor` to fetch the next page.
+  static async getCreditTransactions(
+    beforeCursor?: string,
+    pageSize: number = 25
+  ): Promise<CreditTransaction[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('credit_transactions')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(pageSize);
+
+      if (beforeCursor) {
+        query = query.lt('created_at', beforeCursor);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching credit transactions:', error);
