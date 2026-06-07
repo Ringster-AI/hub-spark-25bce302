@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
               owner_user_id: userId,
               title: "Incoming call",
               body: callerName ? `${callerName} · ${callerNumber ?? ""}` : (callerNumber ?? "New call"),
-              data: { active_call_id: ac.id, vapi_call_id: vapiCallId },
+              data: { active_call_id: ac.id, vapi_call_id: vapiCallId, listen_url: listenUrl ?? null },
             },
           });
         } catch (e) {
