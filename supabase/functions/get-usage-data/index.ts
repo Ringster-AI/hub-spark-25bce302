@@ -58,10 +58,8 @@ serve(async (req) => {
 
     const userId = claimsData.user.id
 
-    // Use service role client for data queries
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     console.log('Fetching subscription data for user:', userId)
+
     
     const { data: subscriptionData, error: subscriptionError } = await supabase
       .from('user_subscriptions')
