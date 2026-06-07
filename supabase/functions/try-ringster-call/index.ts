@@ -5,6 +5,13 @@ const IP_LIMIT_PER_HOUR = 5;
 const PHONE_LIMIT_PER_HOUR = 2;
 const WINDOW_MS = 60 * 60 * 1000;
 
+// Module-scoped service client — reused across requests in the same isolate.
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+);
+
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -53,12 +60,8 @@ Deno.serve(async (req) => {
       (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
       'unknown';
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
-
     const sinceIso = new Date(Date.now() - WINDOW_MS).toISOString();
+
 
     // Check IP-based limit
     const { count: ipCount, error: ipErr } = await supabase
