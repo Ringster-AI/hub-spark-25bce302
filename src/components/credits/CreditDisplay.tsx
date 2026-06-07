@@ -20,6 +20,7 @@ export const CreditDisplay = ({ onUpgrade, onTopUp, compact = false }: CreditDis
 
   useEffect(() => {
     let cancelled = false;
+    let channel: ReturnType<typeof import("@/integrations/supabase/client").supabase.channel> | null = null;
 
     const fetchCredits = async () => {
       try {
@@ -32,20 +33,39 @@ export const CreditDisplay = ({ onUpgrade, onTopUp, compact = false }: CreditDis
       }
     };
 
-    fetchCredits();
-
-    // Refresh credits every 30 seconds
-    const interval = setInterval(fetchCredits, 30000);
-
-    // Refresh immediately when a global refresh event fires
-    // (e.g. after returning from Stripe checkout).
     const handleRefresh = () => fetchCredits();
     window.addEventListener("credits:refresh", handleRefresh);
 
+    (async () => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: { user } } = await supabase.auth.getUser();
+      await fetchCredits();
+      if (cancelled || !user) return;
+
+      // Realtime subscription replaces the previous 30s polling.
+      channel = supabase
+        .channel(`credit_display:${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "user_credits",
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => fetchCredits()
+        )
+        .subscribe();
+    })();
+
     return () => {
       cancelled = true;
-      clearInterval(interval);
       window.removeEventListener("credits:refresh", handleRefresh);
+      if (channel) {
+        import("@/integrations/supabase/client").then(({ supabase }) =>
+          supabase.removeChannel(channel!)
+        );
+      }
     };
   }, []);
 
