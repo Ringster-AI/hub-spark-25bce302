@@ -1,12 +1,13 @@
 
 import { VapiBaseService } from './base-service';
+import { summarizeForLog } from '../../utils/redact';
 
 export class VapiAssistantService extends VapiBaseService {
   async createAssistant(config: any) {
-    console.log('Creating Vapi assistant with config:', JSON.stringify(config, null, 2));
-    
+    console.log('Creating Vapi assistant with config:', summarizeForLog(config));
+
     const data = await this.makeRequest(this.apiUrl, 'POST', config);
-    console.log('Successfully created Vapi assistant:', data);
+    console.log('Successfully created Vapi assistant id:', (data as any)?.id ?? '[no id]');
     return data;
   }
 
@@ -21,10 +22,10 @@ export class VapiAssistantService extends VapiBaseService {
       }
     };
 
-    console.log('Update configuration:', JSON.stringify(config, null, 2));
+    console.log('Update configuration:', summarizeForLog(config));
 
     const data = await this.makeRequest(`${this.apiUrl}/${assistantId}`, 'PATCH', config);
-    console.log('Successfully updated assistant:', data);
+    console.log('Successfully updated assistant id:', assistantId);
     return data;
   }
 

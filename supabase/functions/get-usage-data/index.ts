@@ -9,6 +9,13 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 }
 
+// Module-scoped service client — reused across requests in the same isolate.
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+)
+
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders, status: 200 })
@@ -51,10 +58,8 @@ serve(async (req) => {
 
     const userId = claimsData.user.id
 
-    // Use service role client for data queries
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     console.log('Fetching subscription data for user:', userId)
+
     
     const { data: subscriptionData, error: subscriptionError } = await supabase
       .from('user_subscriptions')

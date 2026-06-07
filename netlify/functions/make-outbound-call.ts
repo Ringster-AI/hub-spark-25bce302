@@ -3,6 +3,7 @@ import { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { createVapiAssistantConfig } from './services/vapi-config';
 import { authenticateRequest, corsHeaders, unauthorizedResponse, forbiddenResponse } from './utils/auth';
+import { summarizeForLog } from './utils/redact';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -97,7 +98,7 @@ export const handler: Handler = async (event) => {
       phoneNumberId: undefined // Using shared number, no specific SID needed
     };
 
-    console.log('Making outbound call with payload:', JSON.stringify(vapiPayload, null, 2));
+    console.log('Making outbound call with payload:', summarizeForLog(vapiPayload));
 
     // Send POST request to webhook
     const response = await fetch(outboundCallWebhook, {
