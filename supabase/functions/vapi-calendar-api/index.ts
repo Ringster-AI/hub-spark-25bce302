@@ -9,6 +9,12 @@ const corsHeaders = {
 const TOKEN_ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY') || ''
 const GOOGLE_API_BASE = 'https://www.googleapis.com'
 
+// Module-scoped service client — reused across requests in the same isolate.
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+)
+
 // ─── Utility helpers ────────────────────────────────────────────────
 
 function localToUTCISO(naive: string, tz: string): string {
@@ -1010,10 +1016,8 @@ Deno.serve(async (req) => {
     )
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
+
+
 
   try {
     const body = await req.json()
