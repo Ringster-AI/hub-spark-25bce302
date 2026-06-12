@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import posthog from "posthog-js";
 
 export interface CookiePreferences {
   essential: boolean;
@@ -64,6 +65,8 @@ export const useCookieConsent = () => {
     // Analytics scripts (Google Analytics, GTM)
     if (preferences.analytics) {
       loadAnalyticsScripts();
+    } else if ((window as any).__posthog_initialized) {
+      try { posthog.opt_out_capturing(); } catch {}
     }
 
     // Marketing scripts (Meta Pixel)
@@ -102,6 +105,23 @@ export const useCookieConsent = () => {
         gtag('config', 'G-YB77QZJ6T9');
       `;
       document.head.appendChild(gaConfig);
+    }
+
+    // PostHog (product analytics, session recordings, feature flags)
+    const phToken = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN;
+    const phHost = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.com";
+    if (phToken && !(window as any).__posthog_initialized) {
+      posthog.init(phToken, {
+        api_host: phHost,
+        person_profiles: "identified_only",
+        capture_pageview: true,
+        capture_pageleave: true,
+        session_recording: { maskAllInputs: true },
+        autocapture: true,
+      });
+      (window as any).__posthog_initialized = true;
+    } else if (phToken && (window as any).__posthog_initialized) {
+      posthog.opt_in_capturing();
     }
   };
 

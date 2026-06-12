@@ -31,4 +31,34 @@ export const track = (event: EventName, props?: Record<string, unknown>) => {
   } catch {
     /* swallow */
   }
+  // PostHog
+  try {
+    import("posthog-js").then(({ default: posthog }) => {
+      if ((window as any).__posthog_initialized) posthog.capture(event, props);
+    });
+  } catch {
+    /* swallow */
+  }
+};
+
+export const identifyUser = (userId: string, traits?: Record<string, unknown>) => {
+  if (typeof window === "undefined" || !hasAnalyticsConsent()) return;
+  try {
+    import("posthog-js").then(({ default: posthog }) => {
+      if ((window as any).__posthog_initialized) posthog.identify(userId, traits);
+    });
+  } catch {
+    /* swallow */
+  }
+};
+
+export const resetAnalyticsUser = () => {
+  if (typeof window === "undefined") return;
+  try {
+    import("posthog-js").then(({ default: posthog }) => {
+      if ((window as any).__posthog_initialized) posthog.reset();
+    });
+  } catch {
+    /* swallow */
+  }
 };
