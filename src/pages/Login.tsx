@@ -41,13 +41,17 @@ export default function Login() {
     }
     setSigningIn(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
       if (error) {
         setError(error.message);
         return;
+      }
+      if (signInData?.user?.id) {
+        identifyUser(signInData.user.id, { email: signInData.user.email });
+        track("Signed_In", { method: "password" });
       }
       // onAuthStateChange will navigate
     } finally {
