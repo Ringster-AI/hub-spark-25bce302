@@ -33,6 +33,7 @@ const LiveCoach = () => {
       if (error) throw error;
       if (data?.session_token) {
         setSessionToken(data.session_token);
+        trackOnce("First_Listen_Live_Used");
       } else if (data?.error === "limit_reached") {
         setStartError("You've reached your monthly session limit.");
       } else {
