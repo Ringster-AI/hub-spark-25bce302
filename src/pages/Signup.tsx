@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Seo } from "@/components/seo/Seo";
+import { track, identifyUser } from "@/lib/analytics";
 import {
   InputOTP,
   InputOTPGroup,
