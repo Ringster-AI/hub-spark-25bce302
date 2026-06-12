@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Seo } from "@/components/seo/Seo";
+import { track, identifyUser } from "@/lib/analytics";
 import {
   InputOTP,
   InputOTPGroup,
@@ -175,6 +176,11 @@ const Signup = () => {
 
       if (typeof (window as any).fbq === "function") {
         (window as any).fbq("track", "CompleteRegistration");
+      }
+
+      if (userId) {
+        identifyUser(userId, { email: data.email, company: data.company, industry: data.industry });
+        track("Signed_Up", { method: "otp", industry: data.industry });
       }
 
       if (userId) {

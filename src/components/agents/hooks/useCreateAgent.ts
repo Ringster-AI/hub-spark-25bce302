@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AgentFormData } from "@/types/agents";
 import { generateToolInstructions, appendToolInstructionsToDescription } from "@/utils/agentDescriptionUtils";
 import { getNetlifyFunctionsUrl } from "@/utils/netlifyFunctions";
+import { trackOnce } from "@/lib/analytics";
 
 export const useCreateAgent = () => {
   const { toast } = useToast();
@@ -120,13 +121,14 @@ export const useCreateAgent = () => {
 
       return agent;
     },
-    onSuccess: () => {
+    onSuccess: (agent) => {
       // Track agent creation
       if (typeof (window as any).fbq === 'function') {
         (window as any).fbq('trackCustom', 'AgentCreated', {
           content_category: 'Agent Management'
         });
       }
+      trackOnce("First_Agent_Created", { agent_id: agent?.id, agent_type: agent?.agent_type });
 
       toast({
         title: "Agent created successfully",

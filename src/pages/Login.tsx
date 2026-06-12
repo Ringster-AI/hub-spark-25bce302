@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Seo } from "@/components/seo/Seo";
 import { Sparkles, ShieldCheck, PhoneCall, Check, Loader2, LogIn } from "lucide-react";
+import { track, identifyUser } from "@/lib/analytics";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -40,13 +41,17 @@ export default function Login() {
     }
     setSigningIn(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
       if (error) {
         setError(error.message);
         return;
+      }
+      if (signInData?.user?.id) {
+        identifyUser(signInData.user.id, { email: signInData.user.email });
+        track("Signed_In", { method: "password" });
       }
       // onAuthStateChange will navigate
     } finally {

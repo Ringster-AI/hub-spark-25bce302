@@ -12,11 +12,17 @@ import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Seo } from "@/components/seo/Seo";
 import { Menu } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { track } from "@/lib/analytics";
 
 const Index = () => {
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    track("Landing_Viewed", { path: "/" });
+  }, []);
+  
   
   return (
     <main className="overflow-x-hidden">
