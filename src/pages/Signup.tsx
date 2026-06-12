@@ -179,6 +179,11 @@ const Signup = () => {
       }
 
       if (userId) {
+        identifyUser(userId, { email: data.email, company: data.company, industry: data.industry });
+        track("Signed_Up", { method: "otp", industry: data.industry });
+      }
+
+      if (userId) {
         supabase.functions
           .invoke("send-transactional-email", {
             body: {
