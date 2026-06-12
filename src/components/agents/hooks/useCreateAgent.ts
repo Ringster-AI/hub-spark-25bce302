@@ -121,13 +121,15 @@ export const useCreateAgent = () => {
 
       return agent;
     },
-    onSuccess: () => {
+    onSuccess: (agent) => {
       // Track agent creation
       if (typeof (window as any).fbq === 'function') {
         (window as any).fbq('trackCustom', 'AgentCreated', {
           content_category: 'Agent Management'
         });
       }
+      track("First_Agent_Created", { agent_id: agent?.id, agent_type: agent?.agent_type });
+      trackOnce("First_Agent_Created", { agent_id: agent?.id, first: true });
 
       toast({
         title: "Agent created successfully",
