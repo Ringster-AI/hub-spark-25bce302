@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Seo } from "@/components/seo/Seo";
 import { Sparkles, ShieldCheck, PhoneCall, Check, Loader2, LogIn } from "lucide-react";
+import { track, identifyUser } from "@/lib/analytics";
 
 export default function Login() {
   const navigate = useNavigate();
