@@ -1,19 +1,21 @@
 
 import { Hero } from "@/components/landing/Hero";
-import { Features } from "@/components/landing/Features";
-import { FeaturesAndBenefits } from "@/components/landing/FeaturesAndBenefits";
-import { Footer } from "@/components/landing/Footer";
-import { SoundFamiliar } from "@/components/landing/SoundFamiliar";
-import { Testimonials } from "@/components/landing/Testimonials";
-import { FinalCTA } from "@/components/landing/FinalCTA";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Link } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Seo } from "@/components/seo/Seo";
 import { Menu } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { track } from "@/lib/analytics";
+
+// Lazy-load below-the-fold sections to improve LCP and initial bundle size
+const FeaturesAndBenefits = lazy(() => import("@/components/landing/FeaturesAndBenefits").then(m => ({ default: m.FeaturesAndBenefits })));
+const SoundFamiliar = lazy(() => import("@/components/landing/SoundFamiliar").then(m => ({ default: m.SoundFamiliar })));
+const Features = lazy(() => import("@/components/landing/Features").then(m => ({ default: m.Features })));
+const Testimonials = lazy(() => import("@/components/landing/Testimonials").then(m => ({ default: m.Testimonials })));
+const FinalCTA = lazy(() => import("@/components/landing/FinalCTA").then(m => ({ default: m.FinalCTA })));
+const Footer = lazy(() => import("@/components/landing/Footer").then(m => ({ default: m.Footer })));
 
 const Index = () => {
   const isMobile = useIsMobile();
@@ -168,10 +170,12 @@ const Index = () => {
 
       <div className="pt-16 sm:pt-18 md:pt-20">
         <Hero />
-        <FeaturesAndBenefits />
-        <SoundFamiliar />
-        <Features />
-        <Testimonials />
+        <Suspense fallback={<div className="min-h-[400px]" />}>
+          <FeaturesAndBenefits />
+          <SoundFamiliar />
+          <Features />
+          <Testimonials />
+        </Suspense>
         
         {/* FAQ Section */}
         <section className="py-16 md:py-20 bg-background">
@@ -245,9 +249,13 @@ const Index = () => {
           </div>
         </section>
 
-        <FinalCTA />
+        <Suspense fallback={<div className="min-h-[200px]" />}>
+          <FinalCTA />
+        </Suspense>
       </div>
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
     </main>
   );
 };
