@@ -170,10 +170,12 @@ const Index = () => {
 
       <div className="pt-16 sm:pt-18 md:pt-20">
         <Hero />
-        <FeaturesAndBenefits />
-        <SoundFamiliar />
-        <Features />
-        <Testimonials />
+        <Suspense fallback={<div className="min-h-[400px]" />}>
+          <FeaturesAndBenefits />
+          <SoundFamiliar />
+          <Features />
+          <Testimonials />
+        </Suspense>
         
         {/* FAQ Section */}
         <section className="py-16 md:py-20 bg-background">
@@ -247,9 +249,13 @@ const Index = () => {
           </div>
         </section>
 
-        <FinalCTA />
+        <Suspense fallback={<div className="min-h-[200px]" />}>
+          <FinalCTA />
+        </Suspense>
       </div>
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
     </main>
   );
 };
