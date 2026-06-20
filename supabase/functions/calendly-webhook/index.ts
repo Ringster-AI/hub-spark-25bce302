@@ -12,25 +12,99 @@ const corsHeaders = {
  *
  * Configure your Calendly webhook to POST here:
  *   https://<project>.supabase.co/functions/v1/calendly-webhook
+ *
+ * Requires CALENDLY_WEBHOOK_SIGNING_KEY env var matching the signing key Calendly provides
+ * when you create the webhook subscription.
  */
+
+const TOLERANCE_SECONDS = 5 * 60;
+
+async function hmacSha256Hex(secret: string, body: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const signingKey = Deno.env.get('CALENDLY_WEBHOOK_SIGNING_KEY');
+  if (!signingKey) {
+    console.error('CALENDLY_WEBHOOK_SIGNING_KEY is not configured');
+    return new Response(JSON.stringify({ error: 'Webhook misconfigured' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
+    const rawBody = await req.text();
+    const sigHeader = req.headers.get('calendly-webhook-signature') || '';
+
+    // Header format: t=<unix_ts>,v1=<hex_hmac>
+    const parts = Object.fromEntries(
+      sigHeader.split(',').map((kv) => {
+        const [k, ...rest] = kv.trim().split('=');
+        return [k, rest.join('=')];
+      }),
+    );
+    const ts = parts['t'];
+    const receivedSig = (parts['v1'] || '').toLowerCase();
+
+    if (!ts || !receivedSig) {
+      console.warn('Calendly webhook missing signature header');
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const tsNum = Number(ts);
+    if (!Number.isFinite(tsNum) || Math.abs(Date.now() / 1000 - tsNum) > TOLERANCE_SECONDS) {
+      console.warn('Calendly webhook timestamp outside tolerance');
+      return new Response(JSON.stringify({ error: 'Stale signature' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const expectedSig = (await hmacSha256Hex(signingKey, `${ts}.${rawBody}`)).toLowerCase();
+    if (!timingSafeEqual(receivedSig, expectedSig)) {
+      console.warn('Calendly webhook signature mismatch');
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const payload = await req.json();
+    const payload = JSON.parse(rawBody);
     const event = payload.event as string; // e.g. "invitee.created" / "invitee.canceled"
     const resource = payload.payload || {};
 
     console.log('Calendly webhook:', event, JSON.stringify(resource).slice(0, 500));
 
-    // Resource fields differ slightly between events; handle both
     const inviteeUri: string | undefined = resource.uri;
     const eventUri: string | undefined = resource.event;
     const startTime: string | undefined = resource.scheduled_event?.start_time || resource.start_time;
@@ -64,7 +138,6 @@ Deno.serve(async (req) => {
     }
 
     if (event === 'invitee.created') {
-      // Try to update an existing pending row first; if none, insert a lightweight record
       const { data: existing } = await supabase
         .from('calendar_bookings')
         .select('id')
