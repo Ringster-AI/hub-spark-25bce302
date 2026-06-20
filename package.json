@@ -10,7 +10,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -99,7 +101,8 @@
     "tsx": "^4.22.4",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "5.4.21"
+    "vite": "5.4.21",
+    "vitest": "^2.1.9"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.6.1",
