@@ -609,6 +609,22 @@ export const handler: Handler = async (event) => {
         if (updateIdError) {
           console.warn('Failed to update vapi_assistant_id', { requestId, finalAssistantId, updateIdError })
         }
+      } else {
+        const { error: updateToolsError } = await supabase
+          .from('agent_configs')
+          .update({
+            config: {
+              ...currentConfig,
+              vapi_assistant_id: finalAssistantId,
+              transfer_tool_id: transferToolId || null,
+              calendar_tool_ids: calendarToolConfig,
+            }
+          })
+          .eq('id', agentId)
+
+        if (updateToolsError) {
+          console.warn('Failed to update Vapi tool config', { requestId, updateToolsError })
+        }
       }
 
       return {
