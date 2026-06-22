@@ -21,9 +21,12 @@ interface AgentFormProps {
   onCancel: () => void;
   canCustomizeVoice: () => boolean;
   disabled?: boolean;
+  isSubmitting?: boolean;
+  submitLabel?: string;
+  submittingLabel?: string;
 }
 
-export const AgentForm = ({ form, onSubmit, onCancel, canCustomizeVoice, disabled }: AgentFormProps) => {
+export const AgentForm = ({ form, onSubmit, onCancel, canCustomizeVoice, disabled, isSubmitting, submitLabel, submittingLabel }: AgentFormProps) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { features } = useSubscriptionFeatures();
 
