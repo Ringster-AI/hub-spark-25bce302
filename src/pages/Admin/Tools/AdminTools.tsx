@@ -198,6 +198,82 @@ export const AdminTools = () => {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sweep Orphan Vapi Tools</CardTitle>
+          <CardDescription>
+            Lists every tool in your Vapi account and deletes any{" "}
+            <code>transferCall</code> or <code>code</code> tool that is no longer
+            referenced by an <code>agent_configs</code> row. Run a dry run first to
+            preview what will be deleted.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => runSweep(true)}
+              disabled={sweepLoading !== null}
+            >
+              {sweepLoading === "dry" ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              Dry run
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => runSweep(false)}
+              disabled={sweepLoading !== null}
+            >
+              {sweepLoading === "run" ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete orphans
+            </Button>
+          </div>
+
+          {sweepResponse && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2 text-sm">
+                <Badge variant="secondary">Total tools: {sweepResponse.total}</Badge>
+                <Badge variant="secondary">Kept: {sweepResponse.kept}</Badge>
+                <Badge
+                  variant="default"
+                  className="bg-emerald-600 hover:bg-emerald-600"
+                >
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {sweepResponse.dryRun ? "Would delete" : "Deleted"}:{" "}
+                  {sweepResponse.dryRun
+                    ? sweepResponse.deletedIds.length
+                    : sweepResponse.deleted}
+                </Badge>
+                {sweepResponse.failed > 0 && (
+                  <Badge variant="destructive">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Failed: {sweepResponse.failed}
+                  </Badge>
+                )}
+                {sweepResponse.dryRun && <Badge variant="outline">Dry run</Badge>}
+              </div>
+
+              {sweepResponse.deletedIds.length > 0 && (
+                <ScrollArea className="h-60 border rounded-md p-3">
+                  <ul className="font-mono text-xs space-y-1">
+                    {sweepResponse.deletedIds.map((id) => (
+                      <li key={id}>{id}</li>
+                    ))}
+                  </ul>
+                </ScrollArea>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
