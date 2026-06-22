@@ -114,6 +114,25 @@ export const AdminAgentsList = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (agent: AdminAgentRow) => {
+      // Best-effort: tell the Netlify function to delete the Vapi assistant
+      // and its tools before we drop the DB row. Failure here is logged but
+      // doesn't block the delete — the orphan sweep can clean up later.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { getNetlifyFunctionsUrl } = await import("@/utils/netlifyFunctions");
+          await fetch(getNetlifyFunctionsUrl("manage-vapi-assistant"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ agentId: agent.id, action: "delete" }),
+          });
+        }
+      } catch (err) {
+        console.warn("Vapi cleanup failed before DB delete", err);
+      }
       const { error } = await supabase.from("agent_configs").delete().eq("id", agent.id);
       if (error) throw error;
     },
