@@ -30,21 +30,25 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return ok({ error: "method not allowed" }, 405);
 
-  // Shared-secret auth — supports Vapi "Bearer Auth", "Secret Token", or assistant-level server.secret
-  if (VAPI_SERVER_SECRET) {
-    const authHeader = req.headers.get("authorization") ?? "";
-    const bearer = authHeader.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7).trim()
-      : null;
-    const provided =
-      bearer ??
-      req.headers.get("x-vapi-secret") ??
-      req.headers.get("x-vapi-signature");
-    if (provided !== VAPI_SERVER_SECRET) {
-      console.warn("vapi-webhook: bad secret");
-      return ok({ error: "unauthorized" }, 401);
-    }
+  // SECURITY: shared secret is REQUIRED. If unset, fail closed — never accept
+  // unsigned webhooks (forged end-of-call reports can corrupt billing).
+  if (!VAPI_SERVER_SECRET) {
+    console.error("vapi-webhook: VAPI_SERVER_SECRET is not configured");
+    return ok({ error: "misconfigured" }, 500);
   }
+  const authHeader = req.headers.get("authorization") ?? "";
+  const bearer = authHeader.toLowerCase().startsWith("bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+  const provided =
+    bearer ??
+    req.headers.get("x-vapi-secret") ??
+    req.headers.get("x-vapi-signature");
+  if (provided !== VAPI_SERVER_SECRET) {
+    console.warn("vapi-webhook: bad secret");
+    return ok({ error: "unauthorized" }, 401);
+  }
+
 
   let payload: any;
   try {
