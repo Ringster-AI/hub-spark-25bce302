@@ -777,7 +777,8 @@ export const handler: Handler = async (event) => {
       const { toolIds: calendarToolIds, calendarToolConfig } = await ensureAssistantCalendarTools(
         vapiData.id,
         currentConfig,
-        isCalendarEnabled
+        isCalendarEnabled,
+        agentId
       )
 
       const allCreateToolIds = [...calendarToolIds]
