@@ -471,8 +471,9 @@ export const handler: Handler = async (event) => {
               }
             })
             .eq('id', agentId)
-        } catch (toolError) {
+        } catch (toolError: any) {
           console.error('Failed to create transfer tool:', toolError)
+          transferToolError = String(toolError?.message || toolError)
           // Do NOT fall back to existingTransferToolId — it may be the dead one.
           transferToolId = null
         }
