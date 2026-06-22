@@ -503,7 +503,10 @@ export const handler: Handler = async (event) => {
             }
           }
 
-          const toolData = await withRetry(() => vapiService.createTransferTool(agent.transfer_directory as Record<string, any>))
+          const toolData = await withRetry(() => vapiService.createTransferTool(
+            agent.transfer_directory as Record<string, any>,
+            { agent_id: agentId, assistant_id: assistantId, tool_kind: 'transfer' }
+          ))
           transferToolId = toolData.id
           console.log('Created transfer tool:', { requestId, transferToolId })
 
