@@ -588,9 +588,19 @@ export const handler: Handler = async (event) => {
             ? updatedAssistant.model.toolIds
             : []
           if (!returnedToolIds.includes(transferToolId)) {
-            console.warn('Transfer tool missing from assistant after PATCH, re-attaching', {
+            console.warn('Transfer tool missing from assistant after PATCH, diagnosing + re-attaching', {
               requestId, transferToolId, returnedToolIds,
             })
+            // Fetch the tool as Vapi stored it — exposes any schema-level rejection.
+            try {
+              const diagRes = await fetch(`${VAPI_TOOL_URL}/${transferToolId}`, {
+                headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+              })
+              const diagBody = await diagRes.text()
+              console.warn('Transfer tool diagnostic GET', { requestId, status: diagRes.status, body: diagBody.slice(0, 2000) })
+            } catch (diagErr) {
+              console.warn('Transfer tool diagnostic GET failed', { requestId, diagErr: String(diagErr) })
+            }
             try {
               const repatchBody = { model: { ...vapiConfig.model, toolIds: allToolIds } }
               const repatchRes = await fetch(`${VAPI_API_URL}/${finalAssistantId}`, {
@@ -605,15 +615,22 @@ export const handler: Handler = async (event) => {
               if (!repatchRes.ok) {
                 const errText = await repatchRes.text()
                 console.error('Re-attach PATCH failed', { requestId, errText })
+                transferToolError = `Vapi rejected transfer tool: ${errText.slice(0, 300)}`
               } else {
                 const repatched = await repatchRes.json()
-                console.log('Re-attach toolIds result', { requestId, toolIds: repatched?.model?.toolIds })
+                const reToolIds: string[] = Array.isArray(repatched?.model?.toolIds) ? repatched.model.toolIds : []
+                console.log('Re-attach toolIds result', { requestId, toolIds: reToolIds })
+                if (!reToolIds.includes(transferToolId)) {
+                  transferToolError = 'Vapi accepted the assistant update but dropped the transfer tool. Check the destination phone numbers (must be valid E.164) and try saving again.'
+                }
               }
             } catch (reErr) {
               console.error('Re-attach error', { requestId, reErr: String(reErr) })
+              transferToolError = String(reErr)
             }
           }
         }
+
 
       } catch (patchError: any) {
         const errorMsg = String(patchError?.message || '')
