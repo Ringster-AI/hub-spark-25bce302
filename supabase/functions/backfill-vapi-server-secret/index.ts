@@ -54,11 +54,14 @@ serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: isSuper } = await admin.rpc("is_super_admin", {
+      _user_id: userData.user.id,
+    });
     const { data: isAdmin } = await admin.rpc("has_role", {
       _user_id: userData.user.id,
       _role: "admin",
     });
-    if (!isAdmin) {
+    if (!isSuper && !isAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden: admin only" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
