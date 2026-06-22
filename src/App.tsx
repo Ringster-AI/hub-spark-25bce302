@@ -32,6 +32,7 @@ import Onboarding from "./pages/Onboarding";
 import AdminLayout from "./pages/Admin/AdminLayout";
 import AdminAgentsList from "./pages/Admin/Agents/AdminAgentsList";
 import AdminAgentDetail from "./pages/Admin/Agents/AdminAgentDetail";
+import AdminTools from "./pages/Admin/Tools/AdminTools";
 import AcceptInvite from "./pages/AcceptInvite";
 import Unsubscribe from "./pages/Unsubscribe";
 import EmailChangeCallback from "./pages/EmailChangeCallback";
@@ -147,6 +148,7 @@ function App() {
               <Route index element={<Navigate to="/admin/agents" replace />} />
               <Route path="agents" element={<AdminAgentsList />} />
               <Route path="agents/:id" element={<AdminAgentDetail />} />
+              <Route path="tools" element={<AdminTools />} />
             </Route>
           </Routes>
           <CookieConsentBanner />
