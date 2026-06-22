@@ -223,7 +223,7 @@ try {
             appointment_type: { type: 'string', description: 'Type' },
             timezone: { type: 'string', description: 'Timezone' },
           },
-          required: ${JSON.stringify(requiredBookingParams)},
+          required: requiredBookingParams,
         },
       },
       code: bookAppointmentCode,
