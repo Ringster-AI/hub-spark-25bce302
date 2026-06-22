@@ -671,7 +671,10 @@ export const handler: Handler = async (event) => {
           assistantId: finalAssistantId,
           action: actionTaken,
           toolIds: allToolIds,
-          transferToolId: transferToolId || existingTransferToolId || null,
+          transferToolId: transferToolId,
+          transferAttached: Boolean(transferToolId),
+          transferToolError,
+          hasTransferDirectory,
           calendarToolsAttached: calendarToolIds.length,
           globalToolsAvailable: calendarToolIds.length,
         })
