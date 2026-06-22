@@ -82,7 +82,10 @@ export const CreateAgentDialog = ({ trigger }: { trigger: React.ReactNode }) => 
             onSubmit={onSubmit} 
             onCancel={() => !createAgentMutation.isPending && setOpen(false)}
             canCustomizeVoice={() => features.limits.canCustomizeVoices}
-            disabled={agentCount >= features.limits.maxAgents || createAgentMutation.isPending}
+            disabled={agentCount >= features.limits.maxAgents}
+            isSubmitting={createAgentMutation.isPending}
+            submitLabel="Create Agent"
+            submittingLabel="Creating agent..."
           />
         </SubscriptionGate>
       </DialogContent>
