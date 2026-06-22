@@ -8,7 +8,7 @@ import { summarizeForLog } from './utils/redact';
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID!;
-const twilioAuthToken = process.env["TWILIO_AUTH _TOKEN"]!;
+const twilioAuthToken = (process.env["TWILIO_AUTH_TOKEN"] ?? process.env["TWILIO_AUTH _TOKEN"])!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 

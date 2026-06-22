@@ -33,7 +33,11 @@ const SENSITIVE_KEYS = new Set([
   "password",
   "secret",
   "twilio_auth_token",
+  "twilioauthtoken",
+  "twilioaccountsid",
+  "twilio_account_sid",
 ]);
+
 
 export function redact(value: unknown, depth = 0): unknown {
   if (depth > 6) return "[truncated]";
