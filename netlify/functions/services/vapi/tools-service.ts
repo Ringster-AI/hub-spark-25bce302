@@ -16,49 +16,46 @@ export class VapiToolsService extends VapiBaseService {
     return `+${digits}`;
   }
 
-  async createTransferTool(transferDirectory: Record<string, any>) {
+  /**
+   * Create a Vapi `transferCall` tool.
+   *
+   * IMPORTANT: Vapi's transferCall tool type does NOT accept an arbitrary
+   * `function.parameters` schema (a custom `destination` enum or `reason` param).
+   * If you send one, Vapi will create the tool but silently strip its ID from
+   * `model.toolIds` when you try to attach it to an assistant.
+   *
+   * The correct shape is just `{ type, destinations }` — the LLM picks the
+   * destination from each entry's `description` (and the assistant's system
+   * prompt context built in `vapi-config.ts`).
+   */
+  async createTransferTool(
+    transferDirectory: Record<string, any>,
+    metadata?: Record<string, unknown>
+  ) {
     console.log('Creating Vapi transfer tool with directory:', transferDirectory);
-    
-    const destinations = Object.entries(transferDirectory).map(([name, entry]) => ({
-      type: "number",
-      number: this.normalizeE164(entry.number),
-      message: entry.transfer_message || `Transferring your call to ${name}.`
-    }));
 
-    const enumValues = destinations.map(d => d.number);
+    const destinations = Object.entries(transferDirectory).map(([name, entry]) => {
+      const keywords = Array.isArray(entry?.keywords) ? entry.keywords.filter(Boolean) : [];
+      const descriptionParts = [`Transfer to ${name}`];
+      if (keywords.length > 0) {
+        descriptionParts.push(`Keywords: ${keywords.join(', ')}`);
+      }
+      return {
+        type: 'number' as const,
+        number: this.normalizeE164(entry.number),
+        message: entry.transfer_message || `Transferring your call to ${name}.`,
+        description: descriptionParts.join('. '),
+      };
+    });
 
-    const toolConfig = {
-      type: "transferCall",
+    const toolConfig: Record<string, unknown> = {
+      type: 'transferCall',
       destinations,
-      function: {
-        name: "transferCall",
-        description: "Transfer the call to a specific department or person.",
-        parameters: {
-          type: "object",
-          properties: {
-            destination: {
-              type: "string",
-              enum: enumValues,
-              description: "The phone number to transfer the call to."
-            },
-            reason: {
-              type: "string",
-              description: "Reason for the transfer"
-            }
-          },
-          required: ["destination"]
-        }
-      },
-      messages: destinations.map(dest => ({
-        type: "request-start",
-        content: dest.message,
-        conditions: [{
-          param: "destination",
-          operator: "eq",
-          value: dest.number
-        }]
-      }))
     };
+
+    if (metadata && Object.keys(metadata).length > 0) {
+      toolConfig.metadata = metadata;
+    }
 
     console.log('Transfer tool configuration:', summarizeForLog(toolConfig));
 

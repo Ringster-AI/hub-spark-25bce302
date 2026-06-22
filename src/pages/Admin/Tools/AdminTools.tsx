@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Wrench, Play, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Wrench, Play, CheckCircle2, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getNetlifyFunctionsUrl } from "@/utils/netlifyFunctions";
 
 type BackfillResult = {
   agentId: string;
@@ -21,9 +22,21 @@ type BackfillResponse = {
   results: BackfillResult[];
 };
 
+type SweepResponse = {
+  total: number;
+  kept: number;
+  deleted: number;
+  failed: number;
+  dryRun: boolean;
+  deletedIds: string[];
+  failedIds: Array<{ id: string; error: string }>;
+};
+
 export const AdminTools = () => {
   const [loading, setLoading] = useState<"dry" | "run" | null>(null);
   const [response, setResponse] = useState<BackfillResponse | null>(null);
+  const [sweepLoading, setSweepLoading] = useState<"dry" | "run" | null>(null);
+  const [sweepResponse, setSweepResponse] = useState<SweepResponse | null>(null);
 
   const run = async (dryRun: boolean) => {
     setLoading(dryRun ? "dry" : "run");
@@ -48,6 +61,40 @@ export const AdminTools = () => {
       });
     } finally {
       setLoading(null);
+    }
+  };
+
+  const runSweep = async (dryRun: boolean) => {
+    setSweepLoading(dryRun ? "dry" : "run");
+    setSweepResponse(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not signed in");
+      const res = await fetch(getNetlifyFunctionsUrl("sweep-vapi-orphans"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ dryRun }),
+      });
+      const data: SweepResponse = await res.json();
+      if (!res.ok) throw new Error((data as any)?.error || `HTTP ${res.status}`);
+      setSweepResponse(data);
+      toast({
+        title: dryRun ? "Sweep dry run complete" : "Sweep complete",
+        description: dryRun
+          ? `${data.deletedIds.length} orphans would be deleted of ${data.total} tools`
+          : `${data.deleted} deleted · ${data.failed} failed · ${data.kept} kept`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Sweep failed",
+        description: err?.message || "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSweepLoading(null);
     }
   };
 
@@ -147,6 +194,82 @@ export const AdminTools = () => {
                   </tbody>
                 </table>
               </ScrollArea>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sweep Orphan Vapi Tools</CardTitle>
+          <CardDescription>
+            Lists every tool in your Vapi account and deletes any{" "}
+            <code>transferCall</code> or <code>code</code> tool that is no longer
+            referenced by an <code>agent_configs</code> row. Run a dry run first to
+            preview what will be deleted.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => runSweep(true)}
+              disabled={sweepLoading !== null}
+            >
+              {sweepLoading === "dry" ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              Dry run
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => runSweep(false)}
+              disabled={sweepLoading !== null}
+            >
+              {sweepLoading === "run" ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete orphans
+            </Button>
+          </div>
+
+          {sweepResponse && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2 text-sm">
+                <Badge variant="secondary">Total tools: {sweepResponse.total}</Badge>
+                <Badge variant="secondary">Kept: {sweepResponse.kept}</Badge>
+                <Badge
+                  variant="default"
+                  className="bg-emerald-600 hover:bg-emerald-600"
+                >
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {sweepResponse.dryRun ? "Would delete" : "Deleted"}:{" "}
+                  {sweepResponse.dryRun
+                    ? sweepResponse.deletedIds.length
+                    : sweepResponse.deleted}
+                </Badge>
+                {sweepResponse.failed > 0 && (
+                  <Badge variant="destructive">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Failed: {sweepResponse.failed}
+                  </Badge>
+                )}
+                {sweepResponse.dryRun && <Badge variant="outline">Dry run</Badge>}
+              </div>
+
+              {sweepResponse.deletedIds.length > 0 && (
+                <ScrollArea className="h-60 border rounded-md p-3">
+                  <ul className="font-mono text-xs space-y-1">
+                    {sweepResponse.deletedIds.map((id) => (
+                      <li key={id}>{id}</li>
+                    ))}
+                  </ul>
+                </ScrollArea>
+              )}
             </div>
           )}
         </CardContent>

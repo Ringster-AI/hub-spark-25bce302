@@ -269,15 +269,23 @@ async function deleteVapiTool(toolId?: string | null) {
   }
 }
 
-async function upsertVapiTool(existingToolId: string | null | undefined, tool: any): Promise<string> {
+async function upsertVapiTool(
+  existingToolId: string | null | undefined,
+  tool: any,
+  metadata?: Record<string, unknown>
+): Promise<string> {
   const isUpdate = Boolean(existingToolId)
+  const toolWithMeta = metadata && Object.keys(metadata).length > 0
+    ? { ...tool, metadata: { ...(tool.metadata || {}), ...metadata } }
+    : tool
+
   const res = await fetch(isUpdate ? `${VAPI_TOOL_URL}/${existingToolId}` : VAPI_TOOL_URL, {
     method: isUpdate ? 'PATCH' : 'POST',
     headers: {
       'Authorization': `Bearer ${VAPI_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(tool),
+    body: JSON.stringify(toolWithMeta),
   })
 
   if (!res.ok) {
@@ -288,10 +296,47 @@ async function upsertVapiTool(existingToolId: string | null | undefined, tool: a
   return data.id
 }
 
+/**
+ * Reconcile Vapi tools tagged with this agent's metadata.agent_id against
+ * the set of tool IDs we expect to keep. Deletes anything that's tagged for
+ * this agent but not in `expectedIds`. Best-effort: failures are logged
+ * and swallowed so they don't block the main save flow.
+ */
+async function reconcileAgentTools(agentId: string, expectedIds: Array<string | null | undefined>) {
+  const expected = new Set(expectedIds.filter((id): id is string => Boolean(id)))
+  try {
+    const res = await fetch(VAPI_TOOL_URL, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+    })
+    if (!res.ok) {
+      console.warn('reconcileAgentTools: list failed', { status: res.status })
+      return
+    }
+    const tools = await res.json().catch(() => [])
+    if (!Array.isArray(tools)) return
+
+    const orphans = tools.filter((t: any) => {
+      const metaAgent = t?.metadata?.agent_id
+      return metaAgent === agentId && !expected.has(t.id)
+    })
+
+    if (orphans.length === 0) return
+    console.log('reconcileAgentTools: deleting orphans', {
+      agentId,
+      orphanIds: orphans.map((t: any) => t.id),
+    })
+    await Promise.all(orphans.map((t: any) => deleteVapiTool(t.id)))
+  } catch (err) {
+    console.warn('reconcileAgentTools error', { err: String(err) })
+  }
+}
+
 async function ensureAssistantCalendarTools(
   assistantId: string,
   currentConfig: Record<string, unknown>,
-  includeBookingTools: boolean
+  includeBookingTools: boolean,
+  agentId: string
 ): Promise<{ toolIds: string[]; calendarToolConfig: CalendarToolConfig }> {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || `https://${process.env.VITE_SUPABASE_PROJECT_ID || 'owzerqaududhfwngyqbp'}.supabase.co`
   const calendarSecret = process.env.VAPI_CALENDAR_SECRET || ''
@@ -321,15 +366,16 @@ async function ensureAssistantCalendarTools(
 
   const reusableToolConfig = versionMismatch ? undefined : existingToolConfig
   const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
+  const toolMetadata = { agent_id: agentId, assistant_id: assistantId }
 
   const [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId] = await Promise.all([
     includeBookingTools
-      ? upsertVapiTool(reusableToolConfig?.check_availability_id, checkAvailabilityTool)
+      ? upsertVapiTool(reusableToolConfig?.check_availability_id, checkAvailabilityTool, { ...toolMetadata, tool_kind: 'check_availability' })
       : Promise.resolve(reusableToolConfig?.check_availability_id || null),
     includeBookingTools
-      ? upsertVapiTool(reusableToolConfig?.book_appointment_id, bookAppointmentTool)
+      ? upsertVapiTool(reusableToolConfig?.book_appointment_id, bookAppointmentTool, { ...toolMetadata, tool_kind: 'book_appointment' })
       : Promise.resolve(reusableToolConfig?.book_appointment_id || null),
-    upsertVapiTool(reusableToolConfig?.get_current_datetime_id, getCurrentDatetimeTool),
+    upsertVapiTool(reusableToolConfig?.get_current_datetime_id, getCurrentDatetimeTool, { ...toolMetadata, tool_kind: 'get_current_datetime' }),
   ])
 
   return {
@@ -413,7 +459,41 @@ export const handler: Handler = async (event) => {
 
     const vapiService = new VapiService(VAPI_API_KEY, VAPI_API_URL)
 
-    if (action === 'update') {
+    if (action === 'delete') {
+      const assistantId = getAssistantIdFromAgent(agent)
+      const transferToolIdToDelete = (currentConfig.transfer_tool_id as string | null) || null
+      const calendarCfg = currentConfig.calendar_tool_ids as CalendarToolConfig | undefined
+
+      // Delete every tool we created for this agent first.
+      await Promise.all([
+        deleteVapiTool(transferToolIdToDelete),
+        deleteVapiTool(calendarCfg?.check_availability_id),
+        deleteVapiTool(calendarCfg?.book_appointment_id),
+        deleteVapiTool(calendarCfg?.get_current_datetime_id),
+      ])
+      // Sweep anything else still tagged for this agent.
+      await reconcileAgentTools(agentId, [])
+
+      if (assistantId) {
+        try {
+          const delRes = await fetch(`${VAPI_API_URL}/${assistantId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+          })
+          if (!delRes.ok && delRes.status !== 404) {
+            console.warn('Failed to delete Vapi assistant', { assistantId, status: delRes.status })
+          }
+        } catch (err) {
+          console.warn('Error deleting Vapi assistant', { assistantId, err: String(err) })
+        }
+      }
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: true, deletedAssistantId: assistantId || null })
+      }
+    } else if (action === 'update') {
       const assistantId = getAssistantIdFromAgent(agent)
       if (!assistantId) {
         throw new Error('No VAPI assistant ID found for agent')
@@ -457,7 +537,10 @@ export const handler: Handler = async (event) => {
             }
           }
 
-          const toolData = await withRetry(() => vapiService.createTransferTool(agent.transfer_directory as Record<string, any>))
+          const toolData = await withRetry(() => vapiService.createTransferTool(
+            agent.transfer_directory as Record<string, any>,
+            { agent_id: agentId, assistant_id: assistantId, tool_kind: 'transfer' }
+          ))
           transferToolId = toolData.id
           console.log('Created transfer tool:', { requestId, transferToolId })
 
@@ -496,7 +579,7 @@ export const handler: Handler = async (event) => {
           .eq('id', agentId)
       }
 
-      const initialCalendarTools = await ensureAssistantCalendarTools(assistantId, currentConfig, isCalendarEnabled)
+      const initialCalendarTools = await ensureAssistantCalendarTools(assistantId, currentConfig, isCalendarEnabled, agentId)
       calendarToolIds = initialCalendarTools.toolIds
       calendarToolConfig = initialCalendarTools.calendarToolConfig
 
@@ -539,9 +622,19 @@ export const handler: Handler = async (event) => {
             ? updatedAssistant.model.toolIds
             : []
           if (!returnedToolIds.includes(transferToolId)) {
-            console.warn('Transfer tool missing from assistant after PATCH, re-attaching', {
+            console.warn('Transfer tool missing from assistant after PATCH, diagnosing + re-attaching', {
               requestId, transferToolId, returnedToolIds,
             })
+            // Fetch the tool as Vapi stored it — exposes any schema-level rejection.
+            try {
+              const diagRes = await fetch(`${VAPI_TOOL_URL}/${transferToolId}`, {
+                headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+              })
+              const diagBody = await diagRes.text()
+              console.warn('Transfer tool diagnostic GET', { requestId, status: diagRes.status, body: diagBody.slice(0, 2000) })
+            } catch (diagErr) {
+              console.warn('Transfer tool diagnostic GET failed', { requestId, diagErr: String(diagErr) })
+            }
             try {
               const repatchBody = { model: { ...vapiConfig.model, toolIds: allToolIds } }
               const repatchRes = await fetch(`${VAPI_API_URL}/${finalAssistantId}`, {
@@ -556,15 +649,22 @@ export const handler: Handler = async (event) => {
               if (!repatchRes.ok) {
                 const errText = await repatchRes.text()
                 console.error('Re-attach PATCH failed', { requestId, errText })
+                transferToolError = `Vapi rejected transfer tool: ${errText.slice(0, 300)}`
               } else {
                 const repatched = await repatchRes.json()
-                console.log('Re-attach toolIds result', { requestId, toolIds: repatched?.model?.toolIds })
+                const reToolIds: string[] = Array.isArray(repatched?.model?.toolIds) ? repatched.model.toolIds : []
+                console.log('Re-attach toolIds result', { requestId, toolIds: reToolIds })
+                if (!reToolIds.includes(transferToolId)) {
+                  transferToolError = 'Vapi accepted the assistant update but dropped the transfer tool. Check the destination phone numbers (must be valid E.164) and try saving again.'
+                }
               }
             } catch (reErr) {
               console.error('Re-attach error', { requestId, reErr: String(reErr) })
+              transferToolError = String(reErr)
             }
           }
         }
+
 
       } catch (patchError: any) {
         const errorMsg = String(patchError?.message || '')
@@ -580,7 +680,8 @@ export const handler: Handler = async (event) => {
           const recreatedCalendarTools = await ensureAssistantCalendarTools(
             finalAssistantId,
             { ...currentConfig, calendar_tool_ids: calendarToolConfig },
-            isCalendarEnabled
+            isCalendarEnabled,
+            agentId
           )
           calendarToolIds = recreatedCalendarTools.toolIds
           calendarToolConfig = recreatedCalendarTools.calendarToolConfig
@@ -664,6 +765,17 @@ export const handler: Handler = async (event) => {
         }
       }
 
+      // Reconcile: delete any Vapi tools tagged with this agent that are no
+      // longer in the expected set (orphans from failed prior saves).
+      await reconcileAgentTools(agentId, [
+        transferToolId,
+        calendarToolConfig.check_availability_id,
+        calendarToolConfig.book_appointment_id,
+        calendarToolConfig.get_current_datetime_id,
+      ])
+
+
+
       return {
         statusCode: 200,
         headers: corsHeaders,
@@ -686,7 +798,10 @@ export const handler: Handler = async (event) => {
       if (agent.transfer_directory && typeof agent.transfer_directory === 'object' && Object.keys(agent.transfer_directory).length > 0) {
         console.log('Creating transfer tool for directory:', agent.transfer_directory)
         try {
-          const toolData = await withRetry(() => vapiService.createTransferTool(agent.transfer_directory))
+          const toolData = await withRetry(() => vapiService.createTransferTool(
+            agent.transfer_directory as Record<string, any>,
+            { agent_id: agentId, tool_kind: 'transfer' }
+          ))
           transferToolId = toolData.id
           console.log('Created transfer tool:', { requestId, transferToolId })
         } catch (toolError) {
@@ -707,7 +822,8 @@ export const handler: Handler = async (event) => {
       const { toolIds: calendarToolIds, calendarToolConfig } = await ensureAssistantCalendarTools(
         vapiData.id,
         currentConfig,
-        isCalendarEnabled
+        isCalendarEnabled,
+        agentId
       )
 
       const allCreateToolIds = [...calendarToolIds]
