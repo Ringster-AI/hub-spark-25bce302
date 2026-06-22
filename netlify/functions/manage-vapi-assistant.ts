@@ -545,7 +545,7 @@ export const handler: Handler = async (event) => {
           .eq('id', agentId)
       }
 
-      const initialCalendarTools = await ensureAssistantCalendarTools(assistantId, currentConfig, isCalendarEnabled)
+      const initialCalendarTools = await ensureAssistantCalendarTools(assistantId, currentConfig, isCalendarEnabled, agentId)
       calendarToolIds = initialCalendarTools.toolIds
       calendarToolConfig = initialCalendarTools.calendarToolConfig
 
