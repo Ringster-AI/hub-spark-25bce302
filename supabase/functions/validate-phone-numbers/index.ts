@@ -22,19 +22,44 @@ interface ValidationResult {
   error?: string;
 }
 
+const MAX_BATCH_SIZE = 500;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // SECURITY: require an authenticated user. Twilio Lookup is billable, so we
+  // never want unauthenticated callers (just the public anon key) hitting it.
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     const { phoneNumbers } = await req.json() as { phoneNumbers: PhoneNumber[] };
-    console.log('Validating phone numbers:', phoneNumbers.length);
 
     if (!phoneNumbers || !Array.isArray(phoneNumbers)) {
       return new Response(
@@ -42,6 +67,16 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    if (phoneNumbers.length > MAX_BATCH_SIZE) {
+      return new Response(
+        JSON.stringify({ error: `Too many phone numbers. Max ${MAX_BATCH_SIZE} per request.` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Validating phone numbers:', phoneNumbers.length);
+
 
     // Validate phone numbers using built-in logic and external service if available
     const results: ValidationResult[] = await Promise.all(
