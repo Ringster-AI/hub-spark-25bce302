@@ -195,7 +195,7 @@ export const EditAgentDialog = ({ agent, open, onOpenChange }: EditAgentDialogPr
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (updateMutation.isPending) return; onOpenChange(o); }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Agent</DialogTitle>
@@ -205,7 +205,10 @@ export const EditAgentDialog = ({ agent, open, onOpenChange }: EditAgentDialogPr
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           canCustomizeVoice={() => features.limits.canCustomizeVoices}
-          disabled={updateMutation.isPending}
+          disabled={false}
+          isSubmitting={updateMutation.isPending}
+          submitLabel="Save Changes"
+          submittingLabel="Saving changes..."
         />
       </DialogContent>
     </Dialog>
