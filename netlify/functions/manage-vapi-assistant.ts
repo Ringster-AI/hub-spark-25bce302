@@ -399,6 +399,10 @@ export const handler: Handler = async (event) => {
       // Handle transfer directory: reuse existing tool or create new one
       let transferToolId: string | null = null
       const existingTransferToolId = currentConfig.transfer_tool_id as string | null
+      const hasTransferDirectory =
+        agent.transfer_directory &&
+        typeof agent.transfer_directory === 'object' &&
+        Object.keys(agent.transfer_directory).length > 0
       let calendarToolIds: string[] = []
       let calendarToolConfig: CalendarToolConfig = {
         version: CALENDAR_TOOL_VERSION,
@@ -408,16 +412,14 @@ export const handler: Handler = async (event) => {
         const mergedToolIds = [...calendarIds]
         if (transferToolId) {
           mergedToolIds.push(transferToolId)
-        } else if (existingTransferToolId) {
-          mergedToolIds.push(existingTransferToolId)
         }
         return mergedToolIds
       }
 
-      if (agent.transfer_directory && typeof agent.transfer_directory === 'object' && Object.keys(agent.transfer_directory).length > 0) {
+      if (hasTransferDirectory) {
         console.log('Processing transfer tool for directory:', agent.transfer_directory)
         try {
-          // Delete old transfer tool first to prevent duplicates
+          // Delete old transfer tool first to prevent duplicates / stale refs
           if (existingTransferToolId) {
             console.log('Deleting old transfer tool:', existingTransferToolId)
             try {
@@ -446,8 +448,26 @@ export const handler: Handler = async (event) => {
             .eq('id', agentId)
         } catch (toolError) {
           console.error('Failed to create transfer tool:', toolError)
-          transferToolId = existingTransferToolId || null
+          // Do NOT fall back to existingTransferToolId — it may be the dead one.
+          transferToolId = null
         }
+      } else if (existingTransferToolId) {
+        // No directory configured — clean up any stale transfer tool reference
+        // so we don't attach a deleted tool id to the assistant.
+        console.log('No transfer directory; clearing stale transfer_tool_id:', existingTransferToolId)
+        try {
+          await fetch(`${VAPI_TOOL_URL}/${existingTransferToolId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+          })
+        } catch (delErr) {
+          console.warn('Failed to delete stale transfer tool (may already be gone):', delErr)
+        }
+        const { transfer_tool_id: _drop, ...restConfig } = currentConfig as Record<string, unknown>
+        await supabase
+          .from('agent_configs')
+          .update({ config: restConfig })
+          .eq('id', agentId)
       }
 
       const initialCalendarTools = await ensureAssistantCalendarTools(assistantId, currentConfig, isCalendarEnabled)
