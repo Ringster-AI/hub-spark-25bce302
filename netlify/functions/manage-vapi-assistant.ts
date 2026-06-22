@@ -269,15 +269,23 @@ async function deleteVapiTool(toolId?: string | null) {
   }
 }
 
-async function upsertVapiTool(existingToolId: string | null | undefined, tool: any): Promise<string> {
+async function upsertVapiTool(
+  existingToolId: string | null | undefined,
+  tool: any,
+  metadata?: Record<string, unknown>
+): Promise<string> {
   const isUpdate = Boolean(existingToolId)
+  const toolWithMeta = metadata && Object.keys(metadata).length > 0
+    ? { ...tool, metadata: { ...(tool.metadata || {}), ...metadata } }
+    : tool
+
   const res = await fetch(isUpdate ? `${VAPI_TOOL_URL}/${existingToolId}` : VAPI_TOOL_URL, {
     method: isUpdate ? 'PATCH' : 'POST',
     headers: {
       'Authorization': `Bearer ${VAPI_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(tool),
+    body: JSON.stringify(toolWithMeta),
   })
 
   if (!res.ok) {
@@ -288,10 +296,47 @@ async function upsertVapiTool(existingToolId: string | null | undefined, tool: a
   return data.id
 }
 
+/**
+ * Reconcile Vapi tools tagged with this agent's metadata.agent_id against
+ * the set of tool IDs we expect to keep. Deletes anything that's tagged for
+ * this agent but not in `expectedIds`. Best-effort: failures are logged
+ * and swallowed so they don't block the main save flow.
+ */
+async function reconcileAgentTools(agentId: string, expectedIds: Array<string | null | undefined>) {
+  const expected = new Set(expectedIds.filter((id): id is string => Boolean(id)))
+  try {
+    const res = await fetch(VAPI_TOOL_URL, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+    })
+    if (!res.ok) {
+      console.warn('reconcileAgentTools: list failed', { status: res.status })
+      return
+    }
+    const tools = await res.json().catch(() => [])
+    if (!Array.isArray(tools)) return
+
+    const orphans = tools.filter((t: any) => {
+      const metaAgent = t?.metadata?.agent_id
+      return metaAgent === agentId && !expected.has(t.id)
+    })
+
+    if (orphans.length === 0) return
+    console.log('reconcileAgentTools: deleting orphans', {
+      agentId,
+      orphanIds: orphans.map((t: any) => t.id),
+    })
+    await Promise.all(orphans.map((t: any) => deleteVapiTool(t.id)))
+  } catch (err) {
+    console.warn('reconcileAgentTools error', { err: String(err) })
+  }
+}
+
 async function ensureAssistantCalendarTools(
   assistantId: string,
   currentConfig: Record<string, unknown>,
-  includeBookingTools: boolean
+  includeBookingTools: boolean,
+  agentId: string
 ): Promise<{ toolIds: string[]; calendarToolConfig: CalendarToolConfig }> {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || `https://${process.env.VITE_SUPABASE_PROJECT_ID || 'owzerqaududhfwngyqbp'}.supabase.co`
   const calendarSecret = process.env.VAPI_CALENDAR_SECRET || ''
@@ -321,15 +366,16 @@ async function ensureAssistantCalendarTools(
 
   const reusableToolConfig = versionMismatch ? undefined : existingToolConfig
   const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
+  const toolMetadata = { agent_id: agentId, assistant_id: assistantId }
 
   const [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId] = await Promise.all([
     includeBookingTools
-      ? upsertVapiTool(reusableToolConfig?.check_availability_id, checkAvailabilityTool)
+      ? upsertVapiTool(reusableToolConfig?.check_availability_id, checkAvailabilityTool, { ...toolMetadata, tool_kind: 'check_availability' })
       : Promise.resolve(reusableToolConfig?.check_availability_id || null),
     includeBookingTools
-      ? upsertVapiTool(reusableToolConfig?.book_appointment_id, bookAppointmentTool)
+      ? upsertVapiTool(reusableToolConfig?.book_appointment_id, bookAppointmentTool, { ...toolMetadata, tool_kind: 'book_appointment' })
       : Promise.resolve(reusableToolConfig?.book_appointment_id || null),
-    upsertVapiTool(reusableToolConfig?.get_current_datetime_id, getCurrentDatetimeTool),
+    upsertVapiTool(reusableToolConfig?.get_current_datetime_id, getCurrentDatetimeTool, { ...toolMetadata, tool_kind: 'get_current_datetime' }),
   ])
 
   return {
