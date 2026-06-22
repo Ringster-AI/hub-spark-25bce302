@@ -1035,7 +1035,10 @@ Deno.serve(async (req) => {
       result = { error: true, message: `Unknown action: ${action}` }
     }
 
-    console.log(`[${requestId}] completed`, { error: result.error })
+    console.log(`[${requestId}] completed`, {
+      error: result.error,
+      message: result.error ? result.message : undefined,
+    })
 
     return new Response(JSON.stringify(result), {
       status: 200,

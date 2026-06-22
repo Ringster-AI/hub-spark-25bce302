@@ -57,7 +57,22 @@ type CalendarToolConfig = {
   get_current_datetime_id?: string | null
 }
 
-function buildAssistantCalendarTools(supabaseUrl: string, calendarSecret: string, assistantId: string) {
+function buildAssistantCalendarTools(
+  supabaseUrl: string,
+  calendarSecret: string,
+  assistantId: string,
+  currentConfig: Record<string, unknown>
+) {
+  const calendarBookingConfig = currentConfig.calendar_booking && typeof currentConfig.calendar_booking === 'object'
+    ? currentConfig.calendar_booking as Record<string, unknown>
+    : {}
+  const configuredRequiredFields = Array.isArray(calendarBookingConfig.required_fields)
+    ? calendarBookingConfig.required_fields.filter((field): field is string => typeof field === 'string')
+    : []
+  const requiredBookingParams = ['datetime', 'attendee_name', 'attendee_email']
+  if (configuredRequiredFields.includes('phone')) requiredBookingParams.push('attendee_phone')
+  if (configuredRequiredFields.includes('address')) requiredBookingParams.push('attendee_address')
+
   const checkAvailabilityCode = `
 const { date, timezone = 'America/New_York', duration_minutes = 30 } = args;
 const { SUPABASE_URL, CALENDAR_SECRET, ASSISTANT_ID } = env;
@@ -90,6 +105,9 @@ const {
   datetime,
   attendee_name,
   attendee_email = null,
+  attendee_phone = null,
+  attendee_address = null,
+  custom_fields = null,
   duration_minutes = 30,
   appointment_type = 'consultation',
   timezone = 'America/New_York',
@@ -110,6 +128,9 @@ try {
       datetime,
       attendee_name,
       attendee_email,
+      attendee_phone,
+      attendee_address,
+      custom_fields,
       duration_minutes,
       appointment_type,
       timezone,
@@ -195,11 +216,14 @@ try {
             datetime: { type: 'string', description: 'ISO datetime' },
             attendee_name: { type: 'string', description: 'Attendee name' },
             attendee_email: { type: 'string', description: 'Attendee email' },
+            attendee_phone: { type: 'string', description: 'Attendee phone number' },
+            attendee_address: { type: 'string', description: 'Service address or appointment location' },
+            custom_fields: { type: 'object', description: 'Any extra booking fields collected from the caller' },
             duration_minutes: { type: 'number', description: 'Duration' },
             appointment_type: { type: 'string', description: 'Type' },
             timezone: { type: 'string', description: 'Timezone' },
           },
-          required: ['datetime', 'attendee_name'],
+          required: ${JSON.stringify(requiredBookingParams)},
         },
       },
       code: bookAppointmentCode,
@@ -296,7 +320,7 @@ async function ensureAssistantCalendarTools(
   }
 
   const reusableToolConfig = versionMismatch ? undefined : existingToolConfig
-  const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId)
+  const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
 
   const [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId] = await Promise.all([
     includeBookingTools
@@ -576,14 +600,30 @@ export const handler: Handler = async (event) => {
             config: {
               ...currentConfig,
               vapi_assistant_id: finalAssistantId,
-                transfer_tool_id: transferToolId || existingTransferToolId || null,
-                calendar_tool_ids: calendarToolConfig,
+              transfer_tool_id: transferToolId || null,
+              calendar_tool_ids: calendarToolConfig,
             }
           })
           .eq('id', agentId)
 
         if (updateIdError) {
           console.warn('Failed to update vapi_assistant_id', { requestId, finalAssistantId, updateIdError })
+        }
+      } else {
+        const { error: updateToolsError } = await supabase
+          .from('agent_configs')
+          .update({
+            config: {
+              ...currentConfig,
+              vapi_assistant_id: finalAssistantId,
+              transfer_tool_id: transferToolId || null,
+              calendar_tool_ids: calendarToolConfig,
+            }
+          })
+          .eq('id', agentId)
+
+        if (updateToolsError) {
+          console.warn('Failed to update Vapi tool config', { requestId, updateToolsError })
         }
       }
 
