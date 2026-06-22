@@ -753,7 +753,10 @@ export const handler: Handler = async (event) => {
       if (agent.transfer_directory && typeof agent.transfer_directory === 'object' && Object.keys(agent.transfer_directory).length > 0) {
         console.log('Creating transfer tool for directory:', agent.transfer_directory)
         try {
-          const toolData = await withRetry(() => vapiService.createTransferTool(agent.transfer_directory))
+          const toolData = await withRetry(() => vapiService.createTransferTool(
+            agent.transfer_directory as Record<string, any>,
+            { agent_id: agentId, tool_kind: 'transfer' }
+          ))
           transferToolId = toolData.id
           console.log('Created transfer tool:', { requestId, transferToolId })
         } catch (toolError) {
