@@ -69,6 +69,8 @@ project_id = "owzerqaududhfwngyqbp"
     verify_jwt = false
   [functions.email-lifecycle-cron]
     verify_jwt = false
+  [functions.backfill-vapi-server-secret]
+    verify_jwt = false
 
 
 [inbucket]
