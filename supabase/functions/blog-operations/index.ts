@@ -51,6 +51,21 @@ serve(async (req) => {
       );
     }
 
+    // SECURITY: only admins may create/update/delete blog posts.
+    const { data: isAdmin, error: roleError } = await supabaseAdmin.rpc("has_role", {
+      _user_id: user.id,
+      _role: "admin",
+    });
+    if (roleError || !isAdmin) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: admin role required" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 403,
+        }
+      );
+
+
     // Parse the request body
     const { operation, postData, postId } = await req.json();
 
