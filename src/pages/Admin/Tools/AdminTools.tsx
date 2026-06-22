@@ -35,6 +35,8 @@ type SweepResponse = {
 export const AdminTools = () => {
   const [loading, setLoading] = useState<"dry" | "run" | null>(null);
   const [response, setResponse] = useState<BackfillResponse | null>(null);
+  const [sweepLoading, setSweepLoading] = useState<"dry" | "run" | null>(null);
+  const [sweepResponse, setSweepResponse] = useState<SweepResponse | null>(null);
 
   const run = async (dryRun: boolean) => {
     setLoading(dryRun ? "dry" : "run");
@@ -59,6 +61,40 @@ export const AdminTools = () => {
       });
     } finally {
       setLoading(null);
+    }
+  };
+
+  const runSweep = async (dryRun: boolean) => {
+    setSweepLoading(dryRun ? "dry" : "run");
+    setSweepResponse(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not signed in");
+      const res = await fetch(getNetlifyFunctionsUrl("sweep-vapi-orphans"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ dryRun }),
+      });
+      const data: SweepResponse = await res.json();
+      if (!res.ok) throw new Error((data as any)?.error || `HTTP ${res.status}`);
+      setSweepResponse(data);
+      toast({
+        title: dryRun ? "Sweep dry run complete" : "Sweep complete",
+        description: dryRun
+          ? `${data.deletedIds.length} orphans would be deleted of ${data.total} tools`
+          : `${data.deleted} deleted · ${data.failed} failed · ${data.kept} kept`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Sweep failed",
+        description: err?.message || "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSweepLoading(null);
     }
   };
 
