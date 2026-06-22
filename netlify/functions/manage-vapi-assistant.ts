@@ -320,7 +320,7 @@ async function ensureAssistantCalendarTools(
   }
 
   const reusableToolConfig = versionMismatch ? undefined : existingToolConfig
-  const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId)
+  const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
 
   const [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId] = await Promise.all([
     includeBookingTools
