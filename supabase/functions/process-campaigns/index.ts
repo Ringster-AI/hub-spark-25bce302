@@ -39,8 +39,29 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Require a shared cron secret. This endpoint is intended to be invoked by a
+  // trusted scheduler (pg_cron / external cron) and must not be publicly callable.
+  const expectedSecret = Deno.env.get('PROCESS_CAMPAIGNS_SECRET');
+  if (!expectedSecret) {
+    console.error('PROCESS_CAMPAIGNS_SECRET is not configured');
+    return new Response(
+      JSON.stringify({ error: 'Endpoint misconfigured' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  const providedSecret = req.headers.get('x-cron-secret');
+  if (!providedSecret || providedSecret !== expectedSecret) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
     console.log('Processing campaign contacts...');
+
+
+
 
 
     // Get campaigns that need processing
