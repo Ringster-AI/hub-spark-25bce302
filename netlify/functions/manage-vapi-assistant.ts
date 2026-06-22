@@ -459,7 +459,41 @@ export const handler: Handler = async (event) => {
 
     const vapiService = new VapiService(VAPI_API_KEY, VAPI_API_URL)
 
-    if (action === 'update') {
+    if (action === 'delete') {
+      const assistantId = getAssistantIdFromAgent(agent)
+      const transferToolIdToDelete = (currentConfig.transfer_tool_id as string | null) || null
+      const calendarCfg = currentConfig.calendar_tool_ids as CalendarToolConfig | undefined
+
+      // Delete every tool we created for this agent first.
+      await Promise.all([
+        deleteVapiTool(transferToolIdToDelete),
+        deleteVapiTool(calendarCfg?.check_availability_id),
+        deleteVapiTool(calendarCfg?.book_appointment_id),
+        deleteVapiTool(calendarCfg?.get_current_datetime_id),
+      ])
+      // Sweep anything else still tagged for this agent.
+      await reconcileAgentTools(agentId, [])
+
+      if (assistantId) {
+        try {
+          const delRes = await fetch(`${VAPI_API_URL}/${assistantId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+          })
+          if (!delRes.ok && delRes.status !== 404) {
+            console.warn('Failed to delete Vapi assistant', { assistantId, status: delRes.status })
+          }
+        } catch (err) {
+          console.warn('Error deleting Vapi assistant', { assistantId, err: String(err) })
+        }
+      }
+
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: true, deletedAssistantId: assistantId || null })
+      }
+    } else if (action === 'update') {
       const assistantId = getAssistantIdFromAgent(agent)
       if (!assistantId) {
         throw new Error('No VAPI assistant ID found for agent')
