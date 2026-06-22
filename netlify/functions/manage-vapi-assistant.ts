@@ -422,6 +422,7 @@ export const handler: Handler = async (event) => {
 
       // Handle transfer directory: reuse existing tool or create new one
       let transferToolId: string | null = null
+      let transferToolError: string | null = null
       const existingTransferToolId = currentConfig.transfer_tool_id as string | null
       const hasTransferDirectory =
         agent.transfer_directory &&
@@ -470,8 +471,9 @@ export const handler: Handler = async (event) => {
               }
             })
             .eq('id', agentId)
-        } catch (toolError) {
+        } catch (toolError: any) {
           console.error('Failed to create transfer tool:', toolError)
+          transferToolError = String(toolError?.message || toolError)
           // Do NOT fall back to existingTransferToolId — it may be the dead one.
           transferToolId = null
         }
@@ -528,7 +530,42 @@ export const handler: Handler = async (event) => {
           return res.json()
         })
         finalAssistantId = updatedAssistant.id
-        console.log('Successfully updated Vapi assistant:', { requestId, updatedAssistantId: finalAssistantId })
+        console.log('Successfully updated Vapi assistant:', { requestId, updatedAssistantId: finalAssistantId, sentToolIds: allToolIds, returnedToolIds: updatedAssistant?.model?.toolIds })
+
+        // Verification: ensure transferToolId actually landed on the assistant.
+        // Sometimes Vapi returns 200 but silently drops a toolId if validation fails.
+        if (transferToolId) {
+          const returnedToolIds: string[] = Array.isArray(updatedAssistant?.model?.toolIds)
+            ? updatedAssistant.model.toolIds
+            : []
+          if (!returnedToolIds.includes(transferToolId)) {
+            console.warn('Transfer tool missing from assistant after PATCH, re-attaching', {
+              requestId, transferToolId, returnedToolIds,
+            })
+            try {
+              const repatchBody = { model: { ...vapiConfig.model, toolIds: allToolIds } }
+              const repatchRes = await fetch(`${VAPI_API_URL}/${finalAssistantId}`, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bearer ${VAPI_API_KEY}`,
+                  'Content-Type': 'application/json',
+                  'x-request-id': `${requestId}-reattach`,
+                },
+                body: JSON.stringify(repatchBody),
+              })
+              if (!repatchRes.ok) {
+                const errText = await repatchRes.text()
+                console.error('Re-attach PATCH failed', { requestId, errText })
+              } else {
+                const repatched = await repatchRes.json()
+                console.log('Re-attach toolIds result', { requestId, toolIds: repatched?.model?.toolIds })
+              }
+            } catch (reErr) {
+              console.error('Re-attach error', { requestId, reErr: String(reErr) })
+            }
+          }
+        }
+
       } catch (patchError: any) {
         const errorMsg = String(patchError?.message || '')
         if (errorMsg.includes("Couldn't Find") || errorMsg.includes('404') || errorMsg.includes('not found')) {
@@ -634,7 +671,10 @@ export const handler: Handler = async (event) => {
           assistantId: finalAssistantId,
           action: actionTaken,
           toolIds: allToolIds,
-          transferToolId: transferToolId || existingTransferToolId || null,
+          transferToolId: transferToolId,
+          transferAttached: Boolean(transferToolId),
+          transferToolError,
+          hasTransferDirectory,
           calendarToolsAttached: calendarToolIds.length,
           globalToolsAvailable: calendarToolIds.length,
         })

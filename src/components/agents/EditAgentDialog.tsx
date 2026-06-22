@@ -158,21 +158,30 @@ export const EditAgentDialog = ({ agent, open, onOpenChange }: EditAgentDialogPr
       }
 
       // Sync with VAPI assistant
+      let vapiSyncResult: any = null;
       try {
-        await VapiAssistantUpdateService.syncAgentWithVapi(agent.id);
-        console.log("Successfully synced agent with VAPI assistant");
+        vapiSyncResult = await VapiAssistantUpdateService.syncAgentWithVapi(agent.id);
+        console.log("Successfully synced agent with VAPI assistant", vapiSyncResult);
       } catch (vapiError) {
         console.error("Failed to sync with VAPI assistant:", vapiError);
         // Don't throw here as the main operation succeeded
       }
 
-      return updatedAgent;
+      return { updatedAgent, vapiSyncResult };
     },
-    onSuccess: () => {
-      toast({
-        title: "Agent updated successfully",
-        description: "Your AI agent has been updated with the new settings and tool instructions.",
-      });
+    onSuccess: ({ vapiSyncResult }) => {
+      if (vapiSyncResult?.hasTransferDirectory && vapiSyncResult?.transferAttached === false) {
+        toast({
+          title: "Agent saved, but transfer tool failed",
+          description: vapiSyncResult.transferToolError || "Vapi rejected the transfer tool. Check the phone number format (E.164, e.g. +16475235895).",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Agent updated successfully",
+          description: "Your AI agent has been updated with the new settings and tool instructions.",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["agents"] });
       onOpenChange(false);
     },
@@ -195,7 +204,7 @@ export const EditAgentDialog = ({ agent, open, onOpenChange }: EditAgentDialogPr
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (updateMutation.isPending) return; onOpenChange(o); }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Agent</DialogTitle>
@@ -205,7 +214,10 @@ export const EditAgentDialog = ({ agent, open, onOpenChange }: EditAgentDialogPr
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           canCustomizeVoice={() => features.limits.canCustomizeVoices}
-          disabled={updateMutation.isPending}
+          disabled={false}
+          isSubmitting={updateMutation.isPending}
+          submitLabel="Save Changes"
+          submittingLabel="Saving changes..."
         />
       </DialogContent>
     </Dialog>

@@ -21,9 +21,12 @@ interface AgentFormProps {
   onCancel: () => void;
   canCustomizeVoice: () => boolean;
   disabled?: boolean;
+  isSubmitting?: boolean;
+  submitLabel?: string;
+  submittingLabel?: string;
 }
 
-export const AgentForm = ({ form, onSubmit, onCancel, canCustomizeVoice, disabled }: AgentFormProps) => {
+export const AgentForm = ({ form, onSubmit, onCancel, canCustomizeVoice, disabled, isSubmitting, submitLabel, submittingLabel }: AgentFormProps) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { features } = useSubscriptionFeatures();
 
@@ -105,7 +108,7 @@ export const AgentForm = ({ form, onSubmit, onCancel, canCustomizeVoice, disable
           onChange={(value) => form.setValue("transfer_directory", value)}
           disabled={disabled}
         />
-        <FormActions onCancel={onCancel} disabled={disabled} />
+        <FormActions onCancel={onCancel} disabled={disabled} isSubmitting={isSubmitting} submitLabel={submitLabel} submittingLabel={submittingLabel} />
       </form>
     </Form>
   );
