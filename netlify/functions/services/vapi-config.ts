@@ -93,6 +93,9 @@ function buildToolContext(agent: AgentConfig): string {
 
     if (fieldLabels.length > 0) {
       calendarInstructions += `\n\nIMPORTANT: Before booking, you MUST collect the following from the caller: ${fieldLabels.join(', ')}. Do not proceed with booking until all required fields are provided.`;
+      if (requiredFields.includes('phone')) {
+        calendarInstructions += `\n\nPhone number handling: Accept the phone number in whatever format the caller speaks it. Do NOT ask them to repeat it in a specific format (no E.164, no "with country code", no dashes required). Pass the digits as a plain string to book_appointment — the system handles formatting. Never tell the caller you are having trouble saving their phone number.`;
+      }
     }
 
     sections.push(calendarInstructions);
