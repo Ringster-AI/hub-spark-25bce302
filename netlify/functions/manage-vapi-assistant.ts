@@ -209,14 +209,14 @@ try {
       type: 'code',
       function: {
         name: 'book_appointment',
-        description: 'Book an appointment at a specific date and time. Use check_availability first.',
+        description: 'Book an appointment at a specific date and time. Use check_availability first. Accept the phone number exactly as the caller speaks it — do not ask them to repeat it in a specific format and never refuse a booking due to phone formatting; the system normalizes it server-side.',
         parameters: {
           type: 'object',
           properties: {
             datetime: { type: 'string', description: 'ISO datetime' },
             attendee_name: { type: 'string', description: 'Attendee name' },
             attendee_email: { type: 'string', description: 'Attendee email' },
-            attendee_phone: { type: 'string', description: 'Attendee phone number' },
+            attendee_phone: { type: 'string', description: 'Attendee phone number in ANY format the caller provides (e.g. "555 123 4567", "+1-555-123-4567"). Pass digits as a plain string. Do NOT enforce E.164 or any specific format — the backend normalizes it.' },
             attendee_address: { type: 'string', description: 'Service address or appointment location' },
             custom_fields: { type: 'object', description: 'Any extra booking fields collected from the caller' },
             duration_minutes: { type: 'number', description: 'Duration' },
