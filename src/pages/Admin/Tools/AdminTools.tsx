@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Wrench, Play, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Wrench, Play, CheckCircle2, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getNetlifyFunctionsUrl } from "@/utils/netlifyFunctions";
 
 type BackfillResult = {
   agentId: string;
@@ -19,6 +20,16 @@ type BackfillResponse = {
   dryRun: boolean;
   summary: { total: number; ok: number; errors: number; skipped: number };
   results: BackfillResult[];
+};
+
+type SweepResponse = {
+  total: number;
+  kept: number;
+  deleted: number;
+  failed: number;
+  dryRun: boolean;
+  deletedIds: string[];
+  failedIds: Array<{ id: string; error: string }>;
 };
 
 export const AdminTools = () => {
