@@ -600,8 +600,8 @@ export const handler: Handler = async (event) => {
             config: {
               ...currentConfig,
               vapi_assistant_id: finalAssistantId,
-                transfer_tool_id: transferToolId || existingTransferToolId || null,
-                calendar_tool_ids: calendarToolConfig,
+              transfer_tool_id: transferToolId || null,
+              calendar_tool_ids: calendarToolConfig,
             }
           })
           .eq('id', agentId)
