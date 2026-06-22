@@ -731,6 +731,17 @@ export const handler: Handler = async (event) => {
         }
       }
 
+      // Reconcile: delete any Vapi tools tagged with this agent that are no
+      // longer in the expected set (orphans from failed prior saves).
+      await reconcileAgentTools(agentId, [
+        transferToolId,
+        calendarToolConfig.check_availability_id,
+        calendarToolConfig.book_appointment_id,
+        calendarToolConfig.get_current_datetime_id,
+      ])
+
+
+
       return {
         statusCode: 200,
         headers: corsHeaders,
