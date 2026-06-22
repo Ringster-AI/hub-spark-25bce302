@@ -1,10 +1,11 @@
 import { NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
-import { Shield, Bot, ArrowLeft } from "lucide-react";
+import { Shield, Bot, ArrowLeft, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 const navItems = [
   { to: "/admin/agents", label: "Agents", icon: Bot },
+  { to: "/admin/tools", label: "Tools", icon: Wrench },
 ];
 
 export const AdminLayout = () => {
