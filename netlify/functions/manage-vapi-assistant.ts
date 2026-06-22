@@ -422,6 +422,7 @@ export const handler: Handler = async (event) => {
 
       // Handle transfer directory: reuse existing tool or create new one
       let transferToolId: string | null = null
+      let transferToolError: string | null = null
       const existingTransferToolId = currentConfig.transfer_tool_id as string | null
       const hasTransferDirectory =
         agent.transfer_directory &&
