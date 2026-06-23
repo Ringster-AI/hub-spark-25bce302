@@ -48,7 +48,7 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.5'
+const CALENDAR_TOOL_VERSION = '2.6'
 
 type CalendarToolConfig = {
   version: string
@@ -119,7 +119,7 @@ function buildBookingFieldRegistry(calendarBookingConfig: Record<string, unknown
  */
 function computeBookingSignature(registry: BookingFieldDef[]): string {
   const stable = [
-    'book-tool-payload:attendee_phone-attendee_address-custom_fields-v2',
+    'book-tool-payload:attendee_phone-attendee_address-custom_fields-aliases-v3',
     ...registry.map(f => `${f.key}:${f.required ? 'R' : 'O'}:${f.customName ?? ''}`),
   ].join('|')
   // simple non-crypto hash; collisions don't matter for cache busting.
@@ -184,9 +184,15 @@ function buildAssistantCalendarTools(
     attendee_name: { type: 'string', description: 'Attendee full name' },
     attendee_email: { type: 'string', description: 'Attendee email address (required for the calendar invite)' },
     attendee_phone: { type: 'string', description: 'Attendee phone number in any caller-spoken format (digits, spaces, dashes, or spoken words). Always pass it here when the caller provides one, never in appointment_type or notes. The backend normalizes the format.' },
+    phone: { type: 'string', description: 'Backward-compatible alias for attendee_phone. Prefer attendee_phone, but this is accepted when the model captured the caller phone as phone.' },
     phone_number: { type: 'string', description: 'Backward-compatible alias for attendee_phone. Prefer attendee_phone, but if the phone number is captured here the backend will normalize it.' },
     customer_phone: { type: 'string', description: 'Backward-compatible alias for attendee_phone. Prefer attendee_phone.' },
+    customerPhone: { type: 'string', description: 'Backward-compatible alias for attendee_phone. Prefer attendee_phone.' },
+    attendeePhone: { type: 'string', description: 'Backward-compatible alias for attendee_phone. Prefer attendee_phone.' },
     attendee_address: { type: 'string', description: 'Service address or appointment location. Always pass it here when collected, never in appointment_type.' },
+    service_address: { type: 'string', description: 'Backward-compatible alias for attendee_address. Prefer attendee_address.' },
+    address: { type: 'string', description: 'Backward-compatible alias for attendee_address. Prefer attendee_address.' },
+    notes: { type: 'string', description: 'Optional notes from the caller. Do not use for phone or address unless the caller naturally provided them there; the backend may extract them defensively.' },
   }
   for (const field of registry) {
     if (field.customName && !bookingProperties[field.key]) {
