@@ -815,16 +815,39 @@ export const handler: Handler = async (event) => {
         }
       }
 
-      // Reconcile: delete any Vapi tools tagged with this agent that are no
-      // longer in the expected set (orphans from failed prior saves).
-      await reconcileAgentTools(agentId, [
+      const expectedToolIds = [
         transferToolId,
         calendarToolConfig.check_availability_id,
         calendarToolConfig.book_appointment_id,
         calendarToolConfig.get_current_datetime_id,
-      ])
+      ]
 
+      // Reconcile: delete any Vapi tools tagged with this agent that are no
+      // longer in the expected set (orphans from failed prior saves).
+      await reconcileAgentTools(agentId, expectedToolIds)
 
+      // Prune: delete any tool still attached to the assistant that we don't
+      // expect — catches untagged legacy tools that the LLM may still invoke.
+      await pruneAssistantStaleTools(finalAssistantId, expectedToolIds)
+
+      // Verify book_appointment is actually attached when calendar is enabled.
+      let bookingToolError: string | null = null
+      if (isCalendarEnabled && calendarToolConfig.book_appointment_id) {
+        try {
+          const verifyRes = await fetch(`${VAPI_API_URL}/${finalAssistantId}`, {
+            headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+          })
+          if (verifyRes.ok) {
+            const verifyJson = await verifyRes.json()
+            const attached: string[] = Array.isArray(verifyJson?.model?.toolIds) ? verifyJson.model.toolIds : []
+            if (!attached.includes(calendarToolConfig.book_appointment_id)) {
+              bookingToolError = 'Vapi did not attach the booking tool to the assistant. Re-save the agent; if the problem persists, check Vapi tool logs.'
+            }
+          }
+        } catch (verErr) {
+          console.warn('booking tool verify failed', { err: String(verErr) })
+        }
+      }
 
       return {
         statusCode: 200,
@@ -836,6 +859,7 @@ export const handler: Handler = async (event) => {
           transferToolId: transferToolId,
           transferAttached: Boolean(transferToolId),
           transferToolError,
+          bookingToolError,
           hasTransferDirectory,
           calendarToolsAttached: calendarToolIds.length,
           globalToolsAvailable: calendarToolIds.length,
