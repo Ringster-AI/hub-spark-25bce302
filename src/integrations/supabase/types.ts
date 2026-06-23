@@ -277,6 +277,7 @@ export type Database = {
           appointment_type: string | null
           attendee_email: string | null
           attendee_name: string | null
+          attendee_phone: string | null
           booking_source: string | null
           booking_status: string
           call_log_id: string | null
@@ -294,6 +295,7 @@ export type Database = {
           metadata: Json | null
           notes: string | null
           provider: string | null
+          reminder_sent_at: string | null
           updated_at: string
         }
         Insert: {
@@ -301,6 +303,7 @@ export type Database = {
           appointment_type?: string | null
           attendee_email?: string | null
           attendee_name?: string | null
+          attendee_phone?: string | null
           booking_source?: string | null
           booking_status?: string
           call_log_id?: string | null
@@ -318,6 +321,7 @@ export type Database = {
           metadata?: Json | null
           notes?: string | null
           provider?: string | null
+          reminder_sent_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -325,6 +329,7 @@ export type Database = {
           appointment_type?: string | null
           attendee_email?: string | null
           attendee_name?: string | null
+          attendee_phone?: string | null
           booking_source?: string | null
           booking_status?: string
           call_log_id?: string | null
@@ -342,6 +347,7 @@ export type Database = {
           metadata?: Json | null
           notes?: string | null
           provider?: string | null
+          reminder_sent_at?: string | null
           updated_at?: string
         }
         Relationships: [
