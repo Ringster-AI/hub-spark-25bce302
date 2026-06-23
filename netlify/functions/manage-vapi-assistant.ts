@@ -479,9 +479,18 @@ async function ensureAssistantCalendarTools(
   }
 
   const existingToolConfig = (currentConfig.calendar_tool_ids as CalendarToolConfig | undefined) || undefined
-  const versionMismatch = existingToolConfig?.version && existingToolConfig.version !== CALENDAR_TOOL_VERSION
+  const calendarBookingConfig = currentConfig.calendar_booking && typeof currentConfig.calendar_booking === 'object'
+    ? (currentConfig.calendar_booking as Record<string, unknown>)
+    : {}
+  const registry = buildBookingFieldRegistry(calendarBookingConfig)
+  const currentSignature = computeBookingSignature(registry)
 
-  if (versionMismatch) {
+  const versionMismatch = existingToolConfig?.version && existingToolConfig.version !== CALENDAR_TOOL_VERSION
+  const signatureMismatch = existingToolConfig?.signature && existingToolConfig.signature !== currentSignature
+  const mustRecreate = Boolean(versionMismatch || signatureMismatch)
+
+  if (mustRecreate) {
+    console.log('Recreating calendar tools', { versionMismatch, signatureMismatch, currentSignature, stored: existingToolConfig?.signature })
     await Promise.all([
       deleteVapiTool(existingToolConfig?.check_availability_id),
       deleteVapiTool(existingToolConfig?.book_appointment_id),
@@ -489,7 +498,7 @@ async function ensureAssistantCalendarTools(
     ])
   }
 
-  const reusableToolConfig = versionMismatch ? undefined : existingToolConfig
+  const reusableToolConfig = mustRecreate ? undefined : existingToolConfig
   const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
   const toolMetadata = { agent_id: agentId, assistant_id: assistantId }
 
@@ -507,12 +516,14 @@ async function ensureAssistantCalendarTools(
     toolIds: [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId].filter(Boolean) as string[],
     calendarToolConfig: {
       version: CALENDAR_TOOL_VERSION,
+      signature: currentSignature,
       check_availability_id: checkAvailabilityId,
       book_appointment_id: bookAppointmentId,
       get_current_datetime_id: getCurrentDatetimeId,
     },
   }
 }
+
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
