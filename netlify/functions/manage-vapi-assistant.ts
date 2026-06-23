@@ -48,13 +48,81 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.1'
+const CALENDAR_TOOL_VERSION = '2.2'
 
 type CalendarToolConfig = {
   version: string
+  signature?: string | null
   check_availability_id?: string | null
   book_appointment_id?: string | null
   get_current_datetime_id?: string | null
+}
+
+type BookingFieldDef = {
+  key: string
+  label: string
+  required: boolean
+  customName?: string
+}
+
+/**
+ * Build the per-agent registry of booking fields from calendar_booking config.
+ * Base fields (datetime / attendee_name / attendee_email) are always required.
+ * Phone / address / custom:* fields are added based on `required_fields`.
+ * Returning a stable structure lets us derive both the JSON schema and a
+ * deterministic signature used to detect schema drift on the live Vapi tool.
+ */
+function buildBookingFieldRegistry(calendarBookingConfig: Record<string, unknown>): BookingFieldDef[] {
+  const requiredFields = Array.isArray(calendarBookingConfig.required_fields)
+    ? calendarBookingConfig.required_fields.filter((f): f is string => typeof f === 'string')
+    : []
+  const customFields = Array.isArray(calendarBookingConfig.custom_fields)
+    ? (calendarBookingConfig.custom_fields as Array<{ name?: unknown; description?: unknown }>)
+        .filter(f => f && typeof f.name === 'string')
+        .map(f => ({ name: f.name as string, description: typeof f.description === 'string' ? f.description : '' }))
+    : []
+
+  const registry: BookingFieldDef[] = [
+    { key: 'datetime', label: 'ISO datetime', required: true },
+    { key: 'attendee_name', label: 'Attendee full name', required: true },
+    { key: 'attendee_email', label: 'Attendee email address', required: true },
+  ]
+
+  if (requiredFields.includes('phone')) {
+    registry.push({ key: 'attendee_phone', label: 'phone number', required: true })
+  } else {
+    registry.push({ key: 'attendee_phone', label: 'phone number', required: false })
+  }
+  if (requiredFields.includes('address')) {
+    registry.push({ key: 'attendee_address', label: 'service address or appointment location', required: true })
+  } else {
+    registry.push({ key: 'attendee_address', label: 'service address or appointment location', required: false })
+  }
+
+  for (const cf of customFields) {
+    const isReq = requiredFields.includes(`custom:${cf.name}`)
+    registry.push({
+      key: `custom_${cf.name.replace(/[^a-zA-Z0-9_]/g, '_')}`,
+      label: cf.description || cf.name,
+      required: isReq,
+      customName: cf.name,
+    })
+  }
+
+  return registry
+}
+
+/**
+ * Deterministic signature of a registry. Stored alongside tool IDs so a change
+ * in required/custom fields triggers a recreate of the Vapi tool even when
+ * CALENDAR_TOOL_VERSION hasn't moved.
+ */
+function computeBookingSignature(registry: BookingFieldDef[]): string {
+  const stable = registry.map(f => `${f.key}:${f.required ? 'R' : 'O'}:${f.customName ?? ''}`).join('|')
+  // simple non-crypto hash; collisions don't matter for cache busting.
+  let h = 0
+  for (let i = 0; i < stable.length; i++) h = ((h << 5) - h + stable.charCodeAt(i)) | 0
+  return `${CALENDAR_TOOL_VERSION}-${(h >>> 0).toString(36)}`
 }
 
 function buildAssistantCalendarTools(
@@ -66,12 +134,12 @@ function buildAssistantCalendarTools(
   const calendarBookingConfig = currentConfig.calendar_booking && typeof currentConfig.calendar_booking === 'object'
     ? currentConfig.calendar_booking as Record<string, unknown>
     : {}
-  const configuredRequiredFields = Array.isArray(calendarBookingConfig.required_fields)
-    ? calendarBookingConfig.required_fields.filter((field): field is string => typeof field === 'string')
-    : []
-  const requiredBookingParams = ['datetime', 'attendee_name', 'attendee_email']
-  if (configuredRequiredFields.includes('phone')) requiredBookingParams.push('attendee_phone')
-  if (configuredRequiredFields.includes('address')) requiredBookingParams.push('attendee_address')
+  const registry = buildBookingFieldRegistry(calendarBookingConfig)
+  const requiredBookingParams = registry.filter(f => f.required).map(f => f.key)
+  const requiredHumanList = registry
+    .filter(f => f.required && !['datetime', 'attendee_name', 'attendee_email'].includes(f.key))
+    .map(f => f.label)
+
 
   const checkAvailabilityCode = `
 const { date, timezone = 'America/New_York', duration_minutes = 30 } = args;
