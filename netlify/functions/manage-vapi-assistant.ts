@@ -48,7 +48,7 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.3'
+const CALENDAR_TOOL_VERSION = '2.4'
 
 type CalendarToolConfig = {
   version: string
@@ -135,7 +135,12 @@ function buildAssistantCalendarTools(
     ? currentConfig.calendar_booking as Record<string, unknown>
     : {}
   const registry = buildBookingFieldRegistry(calendarBookingConfig)
-  const requiredBookingParams = registry.filter(f => f.required).map(f => f.key)
+  // PERMISSIVE schema: only the truly universal fields are required at the Vapi
+  // schema layer. Required-field enforcement for phone/address/custom lives in
+  // vapi-calendar-api, which can normalize spoken digits and return tool-friendly
+  // retry instructions. Making the schema strict has caused the LLM to refuse
+  // to invoke the tool at all when phone is required, blocking every booking.
+  const requiredBookingParams = ['datetime', 'attendee_name', 'attendee_email']
   const requiredHumanList = registry
     .filter(f => f.required && !['datetime', 'attendee_name', 'attendee_email'].includes(f.key))
     .map(f => f.label)
@@ -143,22 +148,18 @@ function buildAssistantCalendarTools(
     if (field.customName) acc[field.key] = field.customName
     return acc
   }, {})
-  const bookingProperties = registry.reduce<Record<string, any>>((properties, field) => {
-    if (field.key === 'datetime') {
-      properties.datetime = { type: 'string', description: 'ISO datetime for the appointment start time' }
-    } else if (field.key === 'attendee_name') {
-      properties.attendee_name = { type: 'string', description: 'Attendee full name' }
-    } else if (field.key === 'attendee_email') {
-      properties.attendee_email = { type: 'string', description: 'Attendee email address (required for the calendar invite)' }
-    } else if (field.key === 'attendee_phone') {
-      properties.attendee_phone = { type: 'string', description: 'Attendee phone number in any caller-spoken format. Pass the phone number here, not in appointment_type. The backend normalizes spaces, dashes, spoken digits, and +1 formats.' }
-    } else if (field.key === 'attendee_address') {
-      properties.attendee_address = { type: 'string', description: 'Service address or appointment location. Pass the address here, not in appointment_type.' }
-    } else if (field.customName) {
-      properties[field.key] = { type: 'string', description: `${field.label}. This is a custom booking field; pass it as ${field.key}.` }
+  const bookingProperties: Record<string, any> = {
+    datetime: { type: 'string', description: 'ISO datetime for the appointment start time' },
+    attendee_name: { type: 'string', description: 'Attendee full name' },
+    attendee_email: { type: 'string', description: 'Attendee email address (required for the calendar invite)' },
+    attendee_phone: { type: 'string', description: 'Attendee phone number in any caller-spoken format (digits, spaces, dashes, or spoken words). Always pass it here when the caller provides one, never in appointment_type or notes. The backend normalizes the format.' },
+    attendee_address: { type: 'string', description: 'Service address or appointment location. Always pass it here when collected, never in appointment_type.' },
+  }
+  for (const field of registry) {
+    if (field.customName && !bookingProperties[field.key]) {
+      bookingProperties[field.key] = { type: 'string', description: `${field.label}. Custom booking field; pass it as ${field.key}.` }
     }
-    return properties
-  }, {})
+  }
   Object.assign(bookingProperties, {
     custom_fields: { type: 'object', description: 'Any extra booking fields collected from the caller, keyed by field name' },
     duration_minutes: { type: 'number', description: 'Duration in minutes' },

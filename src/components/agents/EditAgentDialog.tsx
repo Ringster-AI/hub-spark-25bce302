@@ -160,20 +160,28 @@ export const EditAgentDialog = ({ agent, open, onOpenChange }: EditAgentDialogPr
           .eq("tool_name", "calendar_booking");
       }
 
-      // Sync with VAPI assistant
+      // Sync with VAPI assistant — surface failures so calendar/tool changes
+      // aren't silently lost when Vapi rejects the update.
       let vapiSyncResult: any = null;
+      let vapiSyncError: string | null = null;
       try {
         vapiSyncResult = await VapiAssistantUpdateService.syncAgentWithVapi(agent.id);
         console.log("Successfully synced agent with VAPI assistant", vapiSyncResult);
-      } catch (vapiError) {
+      } catch (vapiError: any) {
         console.error("Failed to sync with VAPI assistant:", vapiError);
-        // Don't throw here as the main operation succeeded
+        vapiSyncError = String(vapiError?.message || vapiError);
       }
 
-      return { updatedAgent, vapiSyncResult };
+      return { updatedAgent, vapiSyncResult, vapiSyncError };
     },
-    onSuccess: ({ vapiSyncResult }) => {
-      if (vapiSyncResult?.hasTransferDirectory && vapiSyncResult?.transferAttached === false) {
+    onSuccess: ({ vapiSyncResult, vapiSyncError }) => {
+      if (vapiSyncError) {
+        toast({
+          title: "Agent saved, but Vapi sync failed",
+          description: `${vapiSyncError}. The agent's voice assistant may be using stale settings. Please try saving again.`,
+          variant: "destructive",
+        });
+      } else if (vapiSyncResult?.hasTransferDirectory && vapiSyncResult?.transferAttached === false) {
         toast({
           title: "Agent saved, but transfer tool failed",
           description: vapiSyncResult.transferToolError || "Vapi rejected the transfer tool. Check the phone number format (E.164, e.g. +16475235895).",
