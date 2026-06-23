@@ -160,10 +160,10 @@ export function CalendarBookings({ campaignId }: CalendarBookingsProps) {
                     {booking.attendee_email}
                   </div>
                 )}
-                {booking.contact?.phone_number && (
+                {(booking.attendee_phone || booking.contact?.phone_number) && (
                   <div className="flex items-center gap-2 text-sm">
                     <Phone className="h-4 w-4" />
-                    {booking.contact.phone_number}
+                    {booking.attendee_phone || booking.contact?.phone_number}
                   </div>
                 )}
                 {booking.appointment_type && (
@@ -179,8 +179,8 @@ export function CalendarBookings({ campaignId }: CalendarBookingsProps) {
                   </div>
                 )}
                 {booking.notes && (
-                  <div className="text-sm text-muted-foreground">
-                    <strong>Notes:</strong> {booking.notes}
+                  <div className="text-sm text-muted-foreground whitespace-pre-wrap border-l-2 border-muted pl-3 mt-2">
+                    {booking.notes}
                   </div>
                 )}
               </div>
