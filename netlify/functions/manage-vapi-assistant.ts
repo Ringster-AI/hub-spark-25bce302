@@ -332,6 +332,56 @@ async function reconcileAgentTools(agentId: string, expectedIds: Array<string | 
   }
 }
 
+/**
+ * After updating an assistant, fetch its current toolIds from Vapi and delete
+ * any attached tool that we don't expect. This catches stale tools from older
+ * code paths that have no `metadata.agent_id` tag (which would make
+ * `reconcileAgentTools` skip them) but are still attached to the assistant
+ * and being invoked by the LLM with the wrong schema.
+ */
+async function pruneAssistantStaleTools(assistantId: string, expectedIds: Array<string | null | undefined>) {
+  const expected = new Set(expectedIds.filter((id): id is string => Boolean(id)))
+  try {
+    const res = await fetch(`${VAPI_API_URL}/${assistantId}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+    })
+    if (!res.ok) {
+      console.warn('pruneAssistantStaleTools: assistant GET failed', { status: res.status })
+      return
+    }
+    const assistant = await res.json().catch(() => null)
+    const attached: string[] = Array.isArray(assistant?.model?.toolIds) ? assistant.model.toolIds : []
+    const stale = attached.filter((id) => !expected.has(id))
+    if (stale.length === 0) return
+
+    console.log('pruneAssistantStaleTools: detaching + deleting stale tools', { assistantId, stale, expected: [...expected] })
+
+    // Re-PATCH the assistant with only the expected toolIds so the LLM stops
+    // seeing the stale schema immediately.
+    try {
+      const detachRes = await fetch(`${VAPI_API_URL}/${assistantId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${VAPI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model: { ...(assistant?.model || {}), toolIds: [...expected] } }),
+      })
+      if (!detachRes.ok) {
+        console.warn('pruneAssistantStaleTools: detach PATCH failed', { status: detachRes.status, body: (await detachRes.text()).slice(0, 500) })
+      }
+    } catch (detachErr) {
+      console.warn('pruneAssistantStaleTools: detach error', { err: String(detachErr) })
+    }
+
+    // Then delete the orphaned tools entirely.
+    await Promise.all(stale.map((id) => deleteVapiTool(id)))
+  } catch (err) {
+    console.warn('pruneAssistantStaleTools error', { err: String(err) })
+  }
+}
+
 async function ensureAssistantCalendarTools(
   assistantId: string,
   currentConfig: Record<string, unknown>,
