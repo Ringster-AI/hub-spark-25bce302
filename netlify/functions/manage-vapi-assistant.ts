@@ -48,7 +48,7 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.2'
+const CALENDAR_TOOL_VERSION = '2.3'
 
 type CalendarToolConfig = {
   version: string
@@ -139,6 +139,32 @@ function buildAssistantCalendarTools(
   const requiredHumanList = registry
     .filter(f => f.required && !['datetime', 'attendee_name', 'attendee_email'].includes(f.key))
     .map(f => f.label)
+  const customFieldParamMap = registry.reduce<Record<string, string>>((acc, field) => {
+    if (field.customName) acc[field.key] = field.customName
+    return acc
+  }, {})
+  const bookingProperties = registry.reduce<Record<string, any>>((properties, field) => {
+    if (field.key === 'datetime') {
+      properties.datetime = { type: 'string', description: 'ISO datetime for the appointment start time' }
+    } else if (field.key === 'attendee_name') {
+      properties.attendee_name = { type: 'string', description: 'Attendee full name' }
+    } else if (field.key === 'attendee_email') {
+      properties.attendee_email = { type: 'string', description: 'Attendee email address (required for the calendar invite)' }
+    } else if (field.key === 'attendee_phone') {
+      properties.attendee_phone = { type: 'string', description: 'Attendee phone number in any caller-spoken format. Pass the phone number here, not in appointment_type. The backend normalizes spaces, dashes, spoken digits, and +1 formats.' }
+    } else if (field.key === 'attendee_address') {
+      properties.attendee_address = { type: 'string', description: 'Service address or appointment location. Pass the address here, not in appointment_type.' }
+    } else if (field.customName) {
+      properties[field.key] = { type: 'string', description: `${field.label}. This is a custom booking field; pass it as ${field.key}.` }
+    }
+    return properties
+  }, {})
+  Object.assign(bookingProperties, {
+    custom_fields: { type: 'object', description: 'Any extra booking fields collected from the caller, keyed by field name' },
+    duration_minutes: { type: 'number', description: 'Duration in minutes' },
+    appointment_type: { type: 'string', description: 'Optional service or appointment category only (e.g. consultation, estimate, repair). Never put phone numbers, email addresses, or service addresses in this field.' },
+    timezone: { type: 'string', description: 'Caller timezone (IANA, e.g. America/New_York)' },
+  })
 
 
   const checkAvailabilityCode = `
@@ -181,6 +207,68 @@ const {
   timezone = 'America/New_York',
 } = args;
 const { SUPABASE_URL, CALENDAR_SECRET, ASSISTANT_ID } = env;
+const CUSTOM_FIELD_PARAM_MAP = ${JSON.stringify(customFieldParamMap)};
+
+const stringifyValue = (value) => {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') {
+    try { return JSON.stringify(value); } catch (_) { return ''; }
+  }
+  return String(value);
+};
+
+const normalizePhoneNumber = (...values) => {
+  const digitWords = { zero: '0', oh: '0', o: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' };
+  const source = values.map(stringifyValue).filter(Boolean).join(' ');
+  if (!source) return null;
+  const wordNormalized = source
+    .toLowerCase()
+    .replace(/[a-z]+/g, (word) => digitWords[word] ?? ' ');
+  const candidates = wordNormalized.match(/(?:\\+?\\d[\\s().-]*){10,15}/g) || [];
+  const rawDigits = (candidates[0] || wordNormalized).replace(/\\D/g, '');
+  if (rawDigits.length < 10) return null;
+  const digits = rawDigits.startsWith('1') && rawDigits.length >= 11
+    ? rawDigits.slice(0, 11)
+    : rawDigits.slice(0, Math.min(rawDigits.length, 15));
+  if (digits.length === 10) return '+1' + digits;
+  if (digits.length >= 11 && digits.length <= 15) return '+' + digits;
+  return null;
+};
+
+const inferAddressFromCombinedField = (value) => {
+  const text = stringifyValue(value).trim();
+  if (!text.includes(',') || !normalizePhoneNumber(text)) return null;
+  const afterComma = text.split(',').slice(1).join(',').trim();
+  return afterComma || null;
+};
+
+const normalizeAppointmentType = (value) => {
+  const text = stringifyValue(value).trim();
+  if (!text) return 'consultation';
+  if (normalizePhoneNumber(text) || /@/.test(text)) return 'consultation';
+  return text;
+};
+
+const normalizedCustomFields = custom_fields && typeof custom_fields === 'object' && !Array.isArray(custom_fields)
+  ? { ...custom_fields }
+  : {};
+for (const [paramKey, fieldName] of Object.entries(CUSTOM_FIELD_PARAM_MAP)) {
+  if (args[paramKey] !== undefined && args[paramKey] !== null && args[paramKey] !== '') {
+    normalizedCustomFields[fieldName] = args[paramKey];
+  }
+}
+
+const normalizedAttendeePhone = normalizePhoneNumber(
+  attendee_phone,
+  args.phone,
+  args.phone_number,
+  args.attendeePhone,
+  args.appointment_type,
+  args.notes,
+  normalizedCustomFields
+);
+const normalizedAttendeeAddress = attendee_address || args.service_address || args.address || inferAddressFromCombinedField(args.appointment_type);
+const normalizedAppointmentType = normalizeAppointmentType(appointment_type);
 
 try {
   const idempotency_key = crypto.randomUUID();
@@ -196,11 +284,11 @@ try {
       datetime,
       attendee_name,
       attendee_email,
-      attendee_phone,
-      attendee_address,
-      custom_fields,
+      attendee_phone: normalizedAttendeePhone,
+      attendee_address: normalizedAttendeeAddress,
+      custom_fields: Object.keys(normalizedCustomFields).length > 0 ? normalizedCustomFields : null,
       duration_minutes,
-      appointment_type,
+      appointment_type: normalizedAppointmentType,
       timezone,
       idempotency_key,
     }),
@@ -287,15 +375,7 @@ try {
         parameters: {
           type: 'object',
           properties: {
-            datetime: { type: 'string', description: 'ISO datetime' },
-            attendee_name: { type: 'string', description: 'Attendee full name' },
-            attendee_email: { type: 'string', description: 'Attendee email address (required)' },
-            attendee_phone: { type: 'string', description: 'Attendee phone number in ANY format the caller provides (e.g. "555 123 4567", "+1-555-123-4567"). Pass digits as a plain string. Do NOT enforce E.164 or any specific format — the backend normalizes it.' },
-            attendee_address: { type: 'string', description: 'Service address or appointment location' },
-            custom_fields: { type: 'object', description: 'Any extra booking fields collected from the caller, keyed by field name' },
-            duration_minutes: { type: 'number', description: 'Duration in minutes' },
-            appointment_type: { type: 'string', description: 'Type of appointment' },
-            timezone: { type: 'string', description: 'Caller timezone (IANA, e.g. America/New_York)' },
+            ...bookingProperties,
           },
           required: requiredBookingParams,
         },

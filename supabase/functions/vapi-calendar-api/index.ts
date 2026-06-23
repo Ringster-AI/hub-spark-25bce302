@@ -52,6 +52,99 @@ function getBookingSource(agentType?: string | null) {
   return agentType === 'outbound' ? 'outbound_campaign' : 'inbound'
 }
 
+function stringifyBookingValue(value: unknown): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return ''
+    }
+  }
+  return String(value)
+}
+
+function normalizePhoneNumber(...values: unknown[]): string | null {
+  const digitWords: Record<string, string> = {
+    zero: '0',
+    oh: '0',
+    o: '0',
+    one: '1',
+    two: '2',
+    three: '3',
+    four: '4',
+    five: '5',
+    six: '6',
+    seven: '7',
+    eight: '8',
+    nine: '9',
+  }
+
+  const source = values.map(stringifyBookingValue).filter(Boolean).join(' ')
+  if (!source) return null
+
+  const wordNormalized = source
+    .toLowerCase()
+    .replace(/[a-z]+/g, (word) => digitWords[word] ?? ' ')
+
+  const candidates = wordNormalized.match(/(?:\+?\d[\s().-]*){10,15}/g) || []
+  const rawDigits = (candidates[0] || wordNormalized).replace(/\D/g, '')
+
+  if (rawDigits.length < 10) return null
+
+  const digits = rawDigits.startsWith('1') && rawDigits.length >= 11
+    ? rawDigits.slice(0, 11)
+    : rawDigits.slice(0, Math.min(rawDigits.length, 15))
+
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length >= 11 && digits.length <= 15) return `+${digits}`
+  return null
+}
+
+function inferAddressFromCombinedField(value: unknown): string | null {
+  const text = stringifyBookingValue(value).trim()
+  if (!text.includes(',') || !normalizePhoneNumber(text)) return null
+
+  const afterComma = text.split(',').slice(1).join(',').trim()
+  return afterComma || null
+}
+
+function normalizeAppointmentType(value: unknown): string {
+  const text = stringifyBookingValue(value).trim()
+  if (!text) return 'consultation'
+  if (normalizePhoneNumber(text) || /@/.test(text)) return 'consultation'
+  return text
+}
+
+function normalizeBookingParams(params: any): any {
+  const customFields = params.custom_fields && typeof params.custom_fields === 'object' && !Array.isArray(params.custom_fields)
+    ? { ...params.custom_fields }
+    : null
+
+  const normalizedPhone = normalizePhoneNumber(
+    params.attendee_phone,
+    params.phone,
+    params.phone_number,
+    params.attendeePhone,
+    params.appointment_type,
+    params.notes,
+    customFields
+  )
+
+  const normalizedAddress = params.attendee_address
+    || params.service_address
+    || params.address
+    || inferAddressFromCombinedField(params.appointment_type)
+
+  return {
+    ...params,
+    attendee_phone: normalizedPhone || params.attendee_phone || null,
+    attendee_address: normalizedAddress || params.attendee_address || null,
+    custom_fields: customFields,
+    appointment_type: normalizeAppointmentType(params.appointment_type),
+  }
+}
+
 // ─── Tenant resolution (provider-agnostic) ──────────────────────────
 
 type CalendarProvider = 'google' | 'cal_com' | 'calendly'
@@ -954,6 +1047,8 @@ async function checkAvailability(supabase: any, params: any) {
 }
 
 async function bookAppointment(supabase: any, params: any) {
+  params = normalizeBookingParams(params)
+
   // Validate email for all providers
   if (!params.attendee_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(params.attendee_email)) {
     return {
@@ -973,7 +1068,7 @@ async function bookAppointment(supabase: any, params: any) {
 
   for (const field of requiredFields) {
     if (field === 'phone' && !params.attendee_phone) {
-      return { error: true, message: 'A phone number is required for this booking. Please ask the caller for their phone number before booking.' }
+      return { error: true, message: 'A usable phone number is required for this booking. Please ask the caller for their phone number, then pass it in the attendee_phone field exactly as heard; digits, spaces, dashes, and spoken digit words are accepted.' }
     }
     if (field === 'address' && !params.attendee_address) {
       return { error: true, message: 'A service address is required for this booking. Please ask the caller for their service address before booking.' }

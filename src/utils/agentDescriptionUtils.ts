@@ -15,9 +15,10 @@ export const generateToolInstructions = (agentData: any) => {
       '1) Ask what day works for them. ' +
       '2) Use check_availability with that date to find open slots. If you are unsure of the caller\'s timezone, ask them. ' +
       '3) Present the available times and let the caller choose. ' +
-      '4) Confirm the caller\'s full name and email (email is optional but helpful). ' +
-      '5) Use book_appointment with the chosen time and caller details to finalize the booking. ' +
-      '6) Confirm the appointment details back to the caller. ' +
+      '4) Confirm the caller\'s full name and email. ' +
+      '5) If this agent requires phone or address, collect them before booking and pass them in attendee_phone and attendee_address, never in appointment_type. ' +
+      '6) Use book_appointment with the chosen time and caller details to finalize the booking. ' +
+      '7) Confirm the appointment details back to the caller. ' +
       'If no slots are available, apologize and suggest trying another day. ' +
       'If a booking fails because the slot was taken, apologize and offer to check availability again.'
     );
