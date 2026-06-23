@@ -766,19 +766,8 @@ async function googleBookAppointment(
       message: 'A valid email address is required to book an appointment. Please ask the caller for their email address.',
     }
   }
+  // Required-field validation now centralized in bookAppointment() dispatcher.
 
-  const agentConfig = tenant.agent.config as Record<string, any> | null
-  const calendarBookingConfig = agentConfig?.calendar_booking as Record<string, any> | null
-  const requiredFields = (calendarBookingConfig?.required_fields as string[]) || []
-
-  for (const field of requiredFields) {
-    if (field === 'phone' && !params.attendee_phone) {
-      return { error: true, message: 'A phone number is required for this booking.' }
-    }
-    if (field === 'address' && !params.attendee_address) {
-      return { error: true, message: 'A service address is required for this booking.' }
-    }
-  }
 
   const duration = params.duration_minutes || tenant.calendarTool.default_duration || 30
   const tz = params.timezone || 'America/New_York'
