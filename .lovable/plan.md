@@ -1,37 +1,78 @@
-I found the likely root cause in the live logs and database:
+## Goal
 
-- The failing `book_appointment` calls are reaching `vapi-calendar-api` without `attendee_phone` at all.
-- The agent is still attached to an older calendar tool config (`calendar_tool_ids.version: 2.0`), so the newer schema/version changes are not actually active for that agent.
-- The current approach makes `attendee_phone` required in Vapi's tool schema when phone is selected. In practice, Vapi/LLM is still invoking the tool without that field, so schema-level required fields are making the flow brittle instead of reliable.
+When the AI books an appointment, capture rich context from the call into the booking's notes field, notify the agent owner (email + SMS), send the attendee a branded confirmation, and follow up with a 24h reminder (email + SMS).
 
-Plan to repair this robustly:
+## Part 1 — Richer booking notes
 
-1. Change `book_appointment` to use a permissive Vapi schema
-   - Keep `datetime`, `attendee_name`, and `attendee_email` required.
-   - Make phone, address, and custom fields optional at the Vapi schema layer, even when the agent requires them.
-   - Keep strong descriptions telling the assistant to collect/pass the fields, but do not depend on Vapi schema enforcement.
+Today the `notes` column on `calendar_bookings` is just "Booked via Ringster AI agent". Replace that with a structured block written by the booking pipeline:
 
-2. Move required-field enforcement fully into our backend
-   - `vapi-calendar-api` will be the single source of truth for required fields from the agent/calendar config.
-   - It will normalize phone/address/custom fields before validation.
-   - If a required field is missing, it returns a short, tool-friendly instruction telling the assistant exactly which field to ask for and which argument name to use.
+```
+Booked via Ringster AI agent
 
-3. Fix config drift between `agent_configs` and `calendar_tools`
-   - In `resolveTenant`, merge calendar settings from both places so required fields are honored no matter which UI saved them.
-   - Prefer the newest non-empty required/custom field config instead of assuming `agent_configs.config.calendar_booking` is always current.
+Caller: {attendee_name} ({attendee_phone})
+Reason: {appointment_type}
 
-4. Add backend compatibility for missed argument names
-   - Accept `attendee_phone`, `phone`, `phone_number`, `caller_phone`, `customer_phone`, and simple custom-field maps.
-   - Accept phone numbers as spoken digits, spaced digits, punctuation, or North American 10-digit numbers.
-   - Preserve normalized values in the booking metadata.
+Summary:
+{ai_call_summary}
 
-5. Force a clean tool refresh
-   - Bump the calendar tool version again.
-   - Update the signature logic so existing agents with stale `2.0` tools are recreated on the next sync.
-   - Add better logging of required fields and whether phone/address were present after normalization, without logging sensitive raw values.
+Call: https://ringster.ai/dashboard/recordings/{call_log_id}
+```
 
-6. Make sync failure visible
-   - If the Vapi assistant sync fails after saving calendar config, show a destructive toast instead of silently continuing.
-   - This prevents a false “saved” state when the database changed but Vapi is still using stale tools.
+Implementation:
+- In `supabase/functions/vapi-calendar-api/index.ts`, when handling the `book_appointment` tool call, look up the originating `call_logs` row via the Vapi `callId` already passed through, and pull `summary`, `attendee_phone`, plus the recording id.
+- If summary isn't ready yet (Vapi posts it slightly after end-of-call), insert the booking with what's available and rely on the existing `vapi-call-events` / `get-vapi-call-data` flow to patch `notes` after the call summary lands.
+- Keep the literal first line "Booked via Ringster AI agent" so existing UI/filters that look for it still match.
 
-After implementation, the flow test agent should only need one save/sync to refresh the Vapi tools. Bookings should no longer fail just because required fields are enabled; missing required info will be handled by backend validation and clear assistant retry instructions instead of brittle Vapi schema requirements.
+## Part 2 — Owner notification (email + SMS)
+
+On every successful booking insert, fan out two messages to the agent owner (the `user_id` on `agent_configs`):
+
+1. **Email to owner** — new app email template `booking-owner-notification.tsx` using the existing booking-confirmation brand styles. Includes attendee name/phone/email, appointment time + timezone, agent name, full notes block, and a deep link to the booking in the dashboard. Sent via the existing `send-transactional-email` queue.
+2. **SMS to owner** — Twilio SMS from the fixed `+1-620-445-8363` Ringster number to the owner's phone (from `profiles.phone_number`). Short format:
+   ```
+   Ringster: New booking — {attendee_name} on {date} {time} {tz}. Details: {short_link}
+   ```
+   Sent through a new `netlify/functions/send-owner-sms.ts` wrapper around the existing Twilio service. Skip silently if the owner has no phone number on file (and log a one-time toast hint in the dashboard later).
+
+Owner notifications must respect a per-agent toggle (`agent_configs.notify_owner_on_booking`, default true) so power users can mute when they don't want the noise.
+
+## Part 3 — Attendee follow-ups
+
+1. **Confirmation (immediate)** — reuse the existing `booking-confirmation.tsx` email template. Already wired; just ensure it fires on insert with the enriched data. If `attendee_phone` is present, also send a short Twilio SMS confirmation.
+2. **24h reminder** — schedule via a new Supabase pg_cron job `process-booking-reminders` running every 15 minutes:
+   - Selects `calendar_bookings` where `appointment_datetime` is 23–24h away, `booking_status = 'confirmed'`, and `reminder_sent_at IS NULL`.
+   - Sends email (`booking-reminder.tsx`, new template) + SMS (if phone present).
+   - Stamps `reminder_sent_at` to prevent double-sends.
+
+## Part 4 — Schema changes
+
+One migration:
+- `ALTER TABLE calendar_bookings ADD COLUMN reminder_sent_at timestamptz`
+- `ALTER TABLE calendar_bookings ADD COLUMN attendee_phone text` (so we can SMS the attendee without joining call_logs every time)
+- `ALTER TABLE agent_configs ADD COLUMN notify_owner_on_booking boolean DEFAULT true`
+- Index on `(booking_status, appointment_datetime)` for the reminder cron query.
+
+## Part 5 — UI
+
+- `CalendarBookings.tsx`: render the new structured notes with preserved line breaks, show attendee phone, and add a "Call summary" expander when present.
+- Agent edit dialog: add a "Notify me on new bookings" toggle bound to `notify_owner_on_booking`.
+
+## Technical / files touched
+
+- `supabase/functions/vapi-calendar-api/index.ts` — enrich notes, store `attendee_phone`, trigger owner + attendee notifications.
+- `supabase/functions/_shared/transactional-email-templates/` — add `booking-owner-notification.tsx` and `booking-reminder.tsx`, update `registry.ts`.
+- `supabase/functions/process-booking-reminders/index.ts` — new cron-driven function.
+- `netlify/functions/send-owner-sms.ts` — Twilio SMS wrapper (owner + attendee).
+- Migration for the three new columns + index.
+- pg_cron schedule for `process-booking-reminders` every 15 min.
+- Frontend: `src/components/campaigns/CalendarBookings.tsx`, `src/components/agents/EditAgentDialog.tsx`.
+
+## Prerequisites
+
+Email infrastructure must be set up (Lovable Emails). I'll check `email_domain--check_email_domain_status` first and run setup if it's not configured before scaffolding the two new app email templates.
+
+## Out of scope
+
+- Post-call thank-you sequence (you chose confirmation + 24h reminder only).
+- Calendar invite (.ics) attachments — Google Calendar event already delivers the native invite to the attendee.
+- Owner-side in-app notification center (can be a follow-up).
