@@ -137,8 +137,11 @@ export const EditAgentDialog = ({ agent, open, onOpenChange }: EditAgentDialogPr
             business_hours_start: formData.calendar_booking.business_hours_start || '09:00',
             business_hours_end: formData.calendar_booking.business_hours_end || '17:00',
             booking_lead_time_hours: formData.calendar_booking.booking_lead_time_hours || 2,
-            require_phone_verification: formData.calendar_booking.require_phone_verification ?? true
+            require_phone_verification: formData.calendar_booking.require_phone_verification ?? true,
+            required_fields: formData.calendar_booking.required_fields || [],
+            custom_fields: formData.calendar_booking.custom_fields || [],
           }
+
         };
 
         const { error: toolError } = await supabase
