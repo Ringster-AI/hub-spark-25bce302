@@ -961,18 +961,60 @@ async function googleBookAppointment(
   if (params.attendee_address) metadata.attendee_address = params.attendee_address
   if (params.custom_fields) metadata.custom_fields = params.custom_fields
 
+  // Try to link this booking to the originating call_logs row so we can attach
+  // the call summary / recording. We don't have callId in the tool payload, so
+  // look up the most recent call for this agent (within 30 min).
+  let callLogId: string | null = null
+  let callSummary: string | null = null
+  try {
+    const { data: recentCall } = await supabase
+      .from('call_logs')
+      .select('id, summary')
+      .eq('agent_id', tenant.agent.id)
+      .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (recentCall) {
+      callLogId = recentCall.id
+      callSummary = recentCall.summary || null
+    }
+  } catch (e) {
+    console.warn('Failed to locate originating call_log:', e)
+  }
+
+  const notifyCtx: BookingNotificationContext = {
+    supabase,
+    bookingId: '',
+    appointmentDatetime: rawStart,
+    durationMinutes: duration,
+    timezone: tz,
+    attendeeName: params.attendee_name,
+    attendeeEmail: params.attendee_email,
+    attendeePhone: params.attendee_phone || null,
+    appointmentType: params.appointment_type || 'consultation',
+    agentId: tenant.agent.id,
+    agentName: (tenant.agent.config as any)?.name || null,
+    ownerUserId: tenant.agent.user_id,
+    callSummary,
+    callLogId,
+  }
+  const enrichedNotes = buildOwnerNotesBlock(notifyCtx)
+
   const bookingRecord: Record<string, any> = {
     appointment_datetime: rawStart,
     duration_minutes: duration,
     attendee_name: params.attendee_name,
     attendee_email: params.attendee_email || null,
+    attendee_phone: params.attendee_phone || null,
     appointment_type: params.appointment_type || 'consultation',
     booking_status: 'confirmed',
     google_event_id: googleEvent.id,
     google_integration_id: tenant.integration.id,
     booking_source: getBookingSource(tenant.agent.agent_type),
     idempotency_key: params.idempotency_key || null,
-    notes: `Booked by agent ${tenant.agent.id}`,
+    notes: enrichedNotes,
+    call_log_id: callLogId,
     metadata: Object.keys(metadata).length > 0 ? metadata : {},
   }
 
@@ -1009,7 +1051,6 @@ async function googleBookAppointment(
     status: 'success',
   })
 
-  const displayTime = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`
   const ampm = hh >= 12 ? 'PM' : 'AM'
   const displayHour = hh > 12 ? hh - 12 : (hh === 0 ? 12 : hh)
   const formattedTime = `${displayHour}:${String(mm).padStart(2,'0')} ${ampm}`
@@ -1017,7 +1058,7 @@ async function googleBookAppointment(
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
   })
 
-  // Send confirmation email
+  // Attendee confirmation email
   if (params.attendee_email) {
     try {
       await supabase.functions.invoke('send-transactional-email', {
@@ -1039,12 +1080,20 @@ async function googleBookAppointment(
     }
   }
 
+  // Owner notification (email + SMS) + attendee SMS
+  try {
+    await notifyOwnerAndAttendee({ ...notifyCtx, bookingId: booking.id })
+  } catch (notifyErr) {
+    console.error('Booking notifications failed:', notifyErr)
+  }
+
   return {
     error: false,
     message: `Appointment booked successfully for ${params.attendee_name} on ${datePart} at ${formattedTime} ${tz} for ${duration} minutes. A confirmation email has been sent to ${params.attendee_email}.`,
     booking: { id: booking.id, datetime: params.datetime, duration_minutes: duration, attendee_name: params.attendee_name },
   }
 }
+
 
 // ─── Provider dispatcher ────────────────────────────────────────────
 
