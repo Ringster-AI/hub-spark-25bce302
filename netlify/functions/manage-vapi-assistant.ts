@@ -209,7 +209,7 @@ try {
       type: 'code',
       function: {
         name: 'book_appointment',
-        description: 'Book an appointment at a specific date and time. Use check_availability first. Accept the phone number exactly as the caller speaks it — do not ask them to repeat it in a specific format and never refuse a booking due to phone formatting; the system normalizes it server-side.',
+        description: 'Book an appointment at a specific date and time. Use check_availability first. Accept the phone number exactly as the caller speaks it — do not ask them to repeat it in a specific format and never refuse a booking due to phone formatting; the system normalizes it server-side. When the agent configuration requires phone or address, you MUST collect those from the caller BEFORE calling this tool and pass them as attendee_phone / attendee_address. Never invoke book_appointment without them when required.',
         parameters: {
           type: 'object',
           properties: {
