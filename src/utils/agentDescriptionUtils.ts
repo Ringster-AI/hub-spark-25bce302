@@ -18,7 +18,7 @@ export const generateToolInstructions = (agentData: any) => {
       '4) Confirm the caller\'s full name and email. ' +
       '5) If this agent requires phone or address, collect them before booking and pass them in attendee_phone and attendee_address, never in appointment_type. ' +
       '6) Use book_appointment with the chosen time and caller details to finalize the booking. ' +
-      '6) Confirm the appointment details back to the caller. ' +
+      '7) Confirm the appointment details back to the caller. ' +
       'If no slots are available, apologize and suggest trying another day. ' +
       'If a booking fails because the slot was taken, apologize and offer to check availability again.'
     );
