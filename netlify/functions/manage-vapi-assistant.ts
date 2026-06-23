@@ -48,7 +48,7 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.0'
+const CALENDAR_TOOL_VERSION = '2.1'
 
 type CalendarToolConfig = {
   version: string
@@ -209,7 +209,7 @@ try {
       type: 'code',
       function: {
         name: 'book_appointment',
-        description: 'Book an appointment at a specific date and time. Use check_availability first. Accept the phone number exactly as the caller speaks it — do not ask them to repeat it in a specific format and never refuse a booking due to phone formatting; the system normalizes it server-side.',
+        description: 'Book an appointment at a specific date and time. Use check_availability first. Accept the phone number exactly as the caller speaks it — do not ask them to repeat it in a specific format and never refuse a booking due to phone formatting; the system normalizes it server-side. When the agent configuration requires phone or address, you MUST collect those from the caller BEFORE calling this tool and pass them as attendee_phone / attendee_address. Never invoke book_appointment without them when required.',
         parameters: {
           type: 'object',
           properties: {
@@ -329,6 +329,56 @@ async function reconcileAgentTools(agentId: string, expectedIds: Array<string | 
     await Promise.all(orphans.map((t: any) => deleteVapiTool(t.id)))
   } catch (err) {
     console.warn('reconcileAgentTools error', { err: String(err) })
+  }
+}
+
+/**
+ * After updating an assistant, fetch its current toolIds from Vapi and delete
+ * any attached tool that we don't expect. This catches stale tools from older
+ * code paths that have no `metadata.agent_id` tag (which would make
+ * `reconcileAgentTools` skip them) but are still attached to the assistant
+ * and being invoked by the LLM with the wrong schema.
+ */
+async function pruneAssistantStaleTools(assistantId: string, expectedIds: Array<string | null | undefined>) {
+  const expected = new Set(expectedIds.filter((id): id is string => Boolean(id)))
+  try {
+    const res = await fetch(`${VAPI_API_URL}/${assistantId}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+    })
+    if (!res.ok) {
+      console.warn('pruneAssistantStaleTools: assistant GET failed', { status: res.status })
+      return
+    }
+    const assistant = await res.json().catch(() => null)
+    const attached: string[] = Array.isArray(assistant?.model?.toolIds) ? assistant.model.toolIds : []
+    const stale = attached.filter((id) => !expected.has(id))
+    if (stale.length === 0) return
+
+    console.log('pruneAssistantStaleTools: detaching + deleting stale tools', { assistantId, stale, expected: [...expected] })
+
+    // Re-PATCH the assistant with only the expected toolIds so the LLM stops
+    // seeing the stale schema immediately.
+    try {
+      const detachRes = await fetch(`${VAPI_API_URL}/${assistantId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${VAPI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model: { ...(assistant?.model || {}), toolIds: [...expected] } }),
+      })
+      if (!detachRes.ok) {
+        console.warn('pruneAssistantStaleTools: detach PATCH failed', { status: detachRes.status, body: (await detachRes.text()).slice(0, 500) })
+      }
+    } catch (detachErr) {
+      console.warn('pruneAssistantStaleTools: detach error', { err: String(detachErr) })
+    }
+
+    // Then delete the orphaned tools entirely.
+    await Promise.all(stale.map((id) => deleteVapiTool(id)))
+  } catch (err) {
+    console.warn('pruneAssistantStaleTools error', { err: String(err) })
   }
 }
 
@@ -765,16 +815,39 @@ export const handler: Handler = async (event) => {
         }
       }
 
-      // Reconcile: delete any Vapi tools tagged with this agent that are no
-      // longer in the expected set (orphans from failed prior saves).
-      await reconcileAgentTools(agentId, [
+      const expectedToolIds = [
         transferToolId,
         calendarToolConfig.check_availability_id,
         calendarToolConfig.book_appointment_id,
         calendarToolConfig.get_current_datetime_id,
-      ])
+      ]
 
+      // Reconcile: delete any Vapi tools tagged with this agent that are no
+      // longer in the expected set (orphans from failed prior saves).
+      await reconcileAgentTools(agentId, expectedToolIds)
 
+      // Prune: delete any tool still attached to the assistant that we don't
+      // expect — catches untagged legacy tools that the LLM may still invoke.
+      await pruneAssistantStaleTools(finalAssistantId, expectedToolIds)
+
+      // Verify book_appointment is actually attached when calendar is enabled.
+      let bookingToolError: string | null = null
+      if (isCalendarEnabled && calendarToolConfig.book_appointment_id) {
+        try {
+          const verifyRes = await fetch(`${VAPI_API_URL}/${finalAssistantId}`, {
+            headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+          })
+          if (verifyRes.ok) {
+            const verifyJson = await verifyRes.json()
+            const attached: string[] = Array.isArray(verifyJson?.model?.toolIds) ? verifyJson.model.toolIds : []
+            if (!attached.includes(calendarToolConfig.book_appointment_id)) {
+              bookingToolError = 'Vapi did not attach the booking tool to the assistant. Re-save the agent; if the problem persists, check Vapi tool logs.'
+            }
+          }
+        } catch (verErr) {
+          console.warn('booking tool verify failed', { err: String(verErr) })
+        }
+      }
 
       return {
         statusCode: 200,
@@ -786,6 +859,7 @@ export const handler: Handler = async (event) => {
           transferToolId: transferToolId,
           transferAttached: Boolean(transferToolId),
           transferToolError,
+          bookingToolError,
           hasTransferDirectory,
           calendarToolsAttached: calendarToolIds.length,
           globalToolsAvailable: calendarToolIds.length,

@@ -176,6 +176,12 @@ export const EditAgentDialog = ({ agent, open, onOpenChange }: EditAgentDialogPr
           description: vapiSyncResult.transferToolError || "Vapi rejected the transfer tool. Check the phone number format (E.164, e.g. +16475235895).",
           variant: "destructive",
         });
+      } else if (vapiSyncResult?.bookingToolError) {
+        toast({
+          title: "Agent saved, but booking tool failed",
+          description: vapiSyncResult.bookingToolError,
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Agent updated successfully",
