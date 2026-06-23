@@ -277,19 +277,25 @@ try {
       type: 'code',
       function: {
         name: 'book_appointment',
-        description: 'Book an appointment at a specific date and time. Use check_availability first. Accept the phone number exactly as the caller speaks it — do not ask them to repeat it in a specific format and never refuse a booking due to phone formatting; the system normalizes it server-side. When the agent configuration requires phone or address, you MUST collect those from the caller BEFORE calling this tool and pass them as attendee_phone / attendee_address. Never invoke book_appointment without them when required.',
+        description:
+          `Book an appointment at a specific date and time. Use check_availability first. ` +
+          `Accept the phone number exactly as the caller speaks it — do not ask them to repeat it in a specific format and never refuse a booking due to phone formatting; the system normalizes it server-side. ` +
+          (requiredHumanList.length > 0
+            ? `BEFORE calling this tool you MUST collect from the caller: ${requiredHumanList.join(', ')}. Never invoke book_appointment without these fields. `
+            : ``) +
+          `Always pass attendee_email; the booking backend uses it for the calendar invite.`,
         parameters: {
           type: 'object',
           properties: {
             datetime: { type: 'string', description: 'ISO datetime' },
-            attendee_name: { type: 'string', description: 'Attendee name' },
-            attendee_email: { type: 'string', description: 'Attendee email' },
+            attendee_name: { type: 'string', description: 'Attendee full name' },
+            attendee_email: { type: 'string', description: 'Attendee email address (required)' },
             attendee_phone: { type: 'string', description: 'Attendee phone number in ANY format the caller provides (e.g. "555 123 4567", "+1-555-123-4567"). Pass digits as a plain string. Do NOT enforce E.164 or any specific format — the backend normalizes it.' },
             attendee_address: { type: 'string', description: 'Service address or appointment location' },
-            custom_fields: { type: 'object', description: 'Any extra booking fields collected from the caller' },
-            duration_minutes: { type: 'number', description: 'Duration' },
-            appointment_type: { type: 'string', description: 'Type' },
-            timezone: { type: 'string', description: 'Timezone' },
+            custom_fields: { type: 'object', description: 'Any extra booking fields collected from the caller, keyed by field name' },
+            duration_minutes: { type: 'number', description: 'Duration in minutes' },
+            appointment_type: { type: 'string', description: 'Type of appointment' },
+            timezone: { type: 'string', description: 'Caller timezone (IANA, e.g. America/New_York)' },
           },
           required: requiredBookingParams,
         },
@@ -301,6 +307,7 @@ try {
         { name: 'ASSISTANT_ID', value: assistantId },
       ],
     },
+
     getCurrentDatetimeTool: {
       type: 'code',
       function: {
