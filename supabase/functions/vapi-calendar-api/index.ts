@@ -1047,6 +1047,8 @@ async function checkAvailability(supabase: any, params: any) {
 }
 
 async function bookAppointment(supabase: any, params: any) {
+  params = normalizeBookingParams(params)
+
   // Validate email for all providers
   if (!params.attendee_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(params.attendee_email)) {
     return {
@@ -1066,7 +1068,7 @@ async function bookAppointment(supabase: any, params: any) {
 
   for (const field of requiredFields) {
     if (field === 'phone' && !params.attendee_phone) {
-      return { error: true, message: 'A phone number is required for this booking. Please ask the caller for their phone number before booking.' }
+      return { error: true, message: 'A usable phone number is required for this booking. Please ask the caller for their phone number, then pass it in the attendee_phone field exactly as heard; digits, spaces, dashes, and spoken digit words are accepted.' }
     }
     if (field === 'address' && !params.attendee_address) {
       return { error: true, message: 'A service address is required for this booking. Please ask the caller for their service address before booking.' }
