@@ -1069,19 +1069,36 @@ async function bookAppointment(supabase: any, params: any) {
 
   const tenant = await resolveTenant(supabase, params.assistant_id)
 
-  // Centralized required-field validation (applies to every provider).
+  // Merge required-field config from agent_configs.config.calendar_booking AND
+  // calendar_tools.configuration. Either may have been written more recently,
+  // and the EditAgentDialog / CalendarTools settings panel write to different
+  // tables. Prefer whichever has non-empty required_fields/custom_fields.
   const agentConfig = tenant.agent.config as Record<string, any> | null
-  const calendarBookingConfig = agentConfig?.calendar_booking as Record<string, any> | null
-  const requiredFields = (calendarBookingConfig?.required_fields as string[]) || []
-  const customFieldDefs = (calendarBookingConfig?.custom_fields as Array<{ name: string; description?: string }>) || []
+  const agentCalBooking = (agentConfig?.calendar_booking as Record<string, any> | null) || {}
+  const toolCfg = (tenant.calendarTool as Record<string, any> | null) || {}
+
+  const pickArray = (...candidates: any[]) => {
+    for (const c of candidates) if (Array.isArray(c) && c.length > 0) return c
+    return []
+  }
+  const requiredFields = pickArray(agentCalBooking.required_fields, toolCfg.required_fields) as string[]
+  const customFieldDefs = pickArray(agentCalBooking.custom_fields, toolCfg.custom_fields) as Array<{ name: string; description?: string }>
   const customFieldsProvided = (params.custom_fields && typeof params.custom_fields === 'object') ? params.custom_fields : {}
+
+  console.log('bookAppointment required-field check', {
+    agent_id: tenant.agent.id,
+    requiredFields,
+    has_phone: Boolean(params.attendee_phone),
+    has_address: Boolean(params.attendee_address),
+    custom_keys: Object.keys(customFieldsProvided),
+  })
 
   for (const field of requiredFields) {
     if (field === 'phone' && !params.attendee_phone) {
-      return { error: true, message: 'A usable phone number is required for this booking. Please ask the caller for their phone number, then pass it in the attendee_phone field exactly as heard; digits, spaces, dashes, and spoken digit words are accepted.' }
+      return { error: true, message: 'Missing phone number. Ask the caller for their phone number and call book_appointment again with the digits placed in the attendee_phone argument (any format — digits, dashes, or spoken words are fine).' }
     }
     if (field === 'address' && !params.attendee_address) {
-      return { error: true, message: 'A service address is required for this booking. Please ask the caller for their service address before booking.' }
+      return { error: true, message: 'Missing service address. Ask the caller for their service address and call book_appointment again with it in the attendee_address argument.' }
     }
     if (field.startsWith('custom:')) {
       const name = field.slice('custom:'.length)
@@ -1089,7 +1106,7 @@ async function bookAppointment(supabase: any, params: any) {
       if (value === undefined || value === null || value === '') {
         const def = customFieldDefs.find(f => f.name === name)
         const label = def?.description || name
-        return { error: true, message: `${label} is required for this booking. Please ask the caller for this information before booking.` }
+        return { error: true, message: `Missing ${label}. Ask the caller for this and call book_appointment again, including custom_fields: { "${name}": "<value>" }.` }
       }
     }
   }
