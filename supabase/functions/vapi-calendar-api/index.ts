@@ -1,5 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { decryptToken, isEncrypted } from '../_shared/crypto.ts'
+import {
+  buildOwnerNotesBlock,
+  notifyOwnerAndAttendee,
+  type BookingNotificationContext,
+} from '../_shared/booking-notifications.ts'
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
