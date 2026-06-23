@@ -13,8 +13,10 @@ export interface CalendarBooking {
   duration_minutes: number;
   attendee_email: string | null;
   attendee_name: string | null;
+  attendee_phone: string | null;
   appointment_type: string | null;
   notes: string | null;
+  reminder_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
