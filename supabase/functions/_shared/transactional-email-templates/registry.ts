@@ -21,6 +21,8 @@ import { template as lowCreditWarning } from './low-credit-warning.tsx'
 import { template as planChanged } from './plan-changed.tsx'
 import { template as paymentFailed } from './payment-failed.tsx'
 import { template as calendarReconnectRequired } from './calendar-reconnect-required.tsx'
+import { template as bookingOwnerNotification } from './booking-owner-notification.tsx'
+import { template as bookingReminder } from './booking-reminder.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry<any>> = {
   'welcome': welcome,
@@ -34,4 +36,6 @@ export const TEMPLATES: Record<string, TemplateEntry<any>> = {
   'plan-changed': planChanged,
   'payment-failed': paymentFailed,
   'calendar-reconnect-required': calendarReconnectRequired,
+  'booking-owner-notification': bookingOwnerNotification,
+  'booking-reminder': bookingReminder,
 }
