@@ -125,7 +125,15 @@ function normalizeBookingParams(params: any): any {
     params.attendee_phone,
     params.phone,
     params.phone_number,
+    params.phoneNumber,
     params.attendeePhone,
+    params.caller_phone,
+    params.callerPhone,
+    params.customer_phone,
+    params.customerPhone,
+    params.contact_phone,
+    params.mobile,
+    params.cell,
     params.appointment_type,
     params.notes,
     customFields
@@ -133,7 +141,9 @@ function normalizeBookingParams(params: any): any {
 
   const normalizedAddress = params.attendee_address
     || params.service_address
+    || params.serviceAddress
     || params.address
+    || params.location
     || inferAddressFromCombinedField(params.appointment_type)
 
   return {
