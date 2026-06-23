@@ -766,19 +766,8 @@ async function googleBookAppointment(
       message: 'A valid email address is required to book an appointment. Please ask the caller for their email address.',
     }
   }
+  // Required-field validation now centralized in bookAppointment() dispatcher.
 
-  const agentConfig = tenant.agent.config as Record<string, any> | null
-  const calendarBookingConfig = agentConfig?.calendar_booking as Record<string, any> | null
-  const requiredFields = (calendarBookingConfig?.required_fields as string[]) || []
-
-  for (const field of requiredFields) {
-    if (field === 'phone' && !params.attendee_phone) {
-      return { error: true, message: 'A phone number is required for this booking.' }
-    }
-    if (field === 'address' && !params.attendee_address) {
-      return { error: true, message: 'A service address is required for this booking.' }
-    }
-  }
 
   const duration = params.duration_minutes || tenant.calendarTool.default_duration || 30
   const tz = params.timezone || 'America/New_York'
@@ -975,6 +964,31 @@ async function bookAppointment(supabase: any, params: any) {
 
   const tenant = await resolveTenant(supabase, params.assistant_id)
 
+  // Centralized required-field validation (applies to every provider).
+  const agentConfig = tenant.agent.config as Record<string, any> | null
+  const calendarBookingConfig = agentConfig?.calendar_booking as Record<string, any> | null
+  const requiredFields = (calendarBookingConfig?.required_fields as string[]) || []
+  const customFieldDefs = (calendarBookingConfig?.custom_fields as Array<{ name: string; description?: string }>) || []
+  const customFieldsProvided = (params.custom_fields && typeof params.custom_fields === 'object') ? params.custom_fields : {}
+
+  for (const field of requiredFields) {
+    if (field === 'phone' && !params.attendee_phone) {
+      return { error: true, message: 'A phone number is required for this booking. Please ask the caller for their phone number before booking.' }
+    }
+    if (field === 'address' && !params.attendee_address) {
+      return { error: true, message: 'A service address is required for this booking. Please ask the caller for their service address before booking.' }
+    }
+    if (field.startsWith('custom:')) {
+      const name = field.slice('custom:'.length)
+      const value = customFieldsProvided[name]
+      if (value === undefined || value === null || value === '') {
+        const def = customFieldDefs.find(f => f.name === name)
+        const label = def?.description || name
+        return { error: true, message: `${label} is required for this booking. Please ask the caller for this information before booking.` }
+      }
+    }
+  }
+
   // Idempotency check (shared across providers)
   if (params.idempotency_key) {
     const { data: existing } = await supabase
@@ -998,6 +1012,7 @@ async function bookAppointment(supabase: any, params: any) {
       return googleBookAppointment(supabase, tenant, params)
   }
 }
+
 
 // ─── HTTP handler ───────────────────────────────────────────────────
 

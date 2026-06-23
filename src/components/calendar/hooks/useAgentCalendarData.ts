@@ -93,8 +93,11 @@ export const useAgentCalendarData = (agentId: string) => {
             require_phone_verification: formData.calendar_booking?.require_phone_verification ?? true,
             calendar_id: formData.calendar_booking?.calendar_id || null,
             calendar_name: formData.calendar_booking?.calendar_name || null,
-            calendar_provider: formData.calendar_booking?.calendar_provider || null
+            calendar_provider: formData.calendar_booking?.calendar_provider || null,
+            required_fields: formData.calendar_booking?.required_fields || [],
+            custom_fields: formData.calendar_booking?.custom_fields || [],
           }
+
         };
 
         const { error } = await supabase
@@ -190,8 +193,11 @@ export const useAgentCalendarData = (agentId: string) => {
             require_phone_verification: data.calendar_booking?.require_phone_verification ?? true,
             calendar_id: data.calendar_booking?.calendar_id || null,
             calendar_name: data.calendar_booking?.calendar_name || null,
-            calendar_provider: data.calendar_booking?.calendar_provider || null
+            calendar_provider: data.calendar_booking?.calendar_provider || null,
+            required_fields: data.calendar_booking?.required_fields || [],
+            custom_fields: data.calendar_booking?.custom_fields || [],
           }
+
         })
         .eq("agent_id", agentId)
         .eq("tool_name", "calendar_booking");
