@@ -600,13 +600,15 @@ async function ensureAssistantCalendarTools(
     : {}
   const registry = buildBookingFieldRegistry(calendarBookingConfig)
   const currentSignature = computeBookingSignature(registry)
+  const liveToolHasBookingFields = await liveBookAppointmentToolSupportsBookingFields(existingToolConfig?.book_appointment_id)
 
   const versionMismatch = existingToolConfig?.version && existingToolConfig.version !== CALENDAR_TOOL_VERSION
   const signatureMismatch = existingToolConfig?.signature && existingToolConfig.signature !== currentSignature
-  const mustRecreate = Boolean(versionMismatch || signatureMismatch)
+  const missingBookingFields = includeBookingTools && !liveToolHasBookingFields
+  const mustRecreate = Boolean(versionMismatch || signatureMismatch || missingBookingFields)
 
   if (mustRecreate) {
-    console.log('Recreating calendar tools', { versionMismatch, signatureMismatch, currentSignature, stored: existingToolConfig?.signature })
+    console.log('Recreating calendar tools', { versionMismatch, signatureMismatch, missingBookingFields, currentSignature, stored: existingToolConfig?.signature })
     await Promise.all([
       deleteVapiTool(existingToolConfig?.check_availability_id),
       deleteVapiTool(existingToolConfig?.book_appointment_id),
