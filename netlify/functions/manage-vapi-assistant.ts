@@ -48,7 +48,7 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.4'
+const CALENDAR_TOOL_VERSION = '2.5'
 
 type CalendarToolConfig = {
   version: string
@@ -118,11 +118,42 @@ function buildBookingFieldRegistry(calendarBookingConfig: Record<string, unknown
  * CALENDAR_TOOL_VERSION hasn't moved.
  */
 function computeBookingSignature(registry: BookingFieldDef[]): string {
-  const stable = registry.map(f => `${f.key}:${f.required ? 'R' : 'O'}:${f.customName ?? ''}`).join('|')
+  const stable = [
+    'book-tool-payload:attendee_phone-attendee_address-custom_fields-v2',
+    ...registry.map(f => `${f.key}:${f.required ? 'R' : 'O'}:${f.customName ?? ''}`),
+  ].join('|')
   // simple non-crypto hash; collisions don't matter for cache busting.
   let h = 0
   for (let i = 0; i < stable.length; i++) h = ((h << 5) - h + stable.charCodeAt(i)) | 0
   return `${CALENDAR_TOOL_VERSION}-${(h >>> 0).toString(36)}`
+}
+
+async function liveBookAppointmentToolSupportsBookingFields(toolId?: string | null): Promise<boolean> {
+  if (!toolId) return false
+
+  try {
+    const res = await fetch(`${VAPI_TOOL_URL}/${toolId}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${VAPI_API_KEY}` },
+    })
+
+    if (!res.ok) {
+      console.warn('Could not inspect live book_appointment tool; will recreate it', { toolId, status: res.status })
+      return false
+    }
+
+    const tool = await res.json().catch(() => null)
+    const code = typeof tool?.code === 'string' ? tool.code : ''
+    const schema = JSON.stringify(tool?.function?.parameters || {})
+
+    return code.includes('attendee_phone')
+      && code.includes('attendee_address')
+      && code.includes('custom_fields')
+      && schema.includes('attendee_phone')
+  } catch (error) {
+    console.warn('Error inspecting live book_appointment tool; will recreate it', { toolId, error: String(error) })
+    return false
+  }
 }
 
 function buildAssistantCalendarTools(
@@ -153,6 +184,8 @@ function buildAssistantCalendarTools(
     attendee_name: { type: 'string', description: 'Attendee full name' },
     attendee_email: { type: 'string', description: 'Attendee email address (required for the calendar invite)' },
     attendee_phone: { type: 'string', description: 'Attendee phone number in any caller-spoken format (digits, spaces, dashes, or spoken words). Always pass it here when the caller provides one, never in appointment_type or notes. The backend normalizes the format.' },
+    phone_number: { type: 'string', description: 'Backward-compatible alias for attendee_phone. Prefer attendee_phone, but if the phone number is captured here the backend will normalize it.' },
+    customer_phone: { type: 'string', description: 'Backward-compatible alias for attendee_phone. Prefer attendee_phone.' },
     attendee_address: { type: 'string', description: 'Service address or appointment location. Always pass it here when collected, never in appointment_type.' },
   }
   for (const field of registry) {
@@ -263,6 +296,8 @@ const normalizedAttendeePhone = normalizePhoneNumber(
   attendee_phone,
   args.phone,
   args.phone_number,
+  args.customer_phone,
+  args.customerPhone,
   args.attendeePhone,
   args.appointment_type,
   args.notes,
@@ -565,13 +600,15 @@ async function ensureAssistantCalendarTools(
     : {}
   const registry = buildBookingFieldRegistry(calendarBookingConfig)
   const currentSignature = computeBookingSignature(registry)
+  const liveToolHasBookingFields = await liveBookAppointmentToolSupportsBookingFields(existingToolConfig?.book_appointment_id)
 
   const versionMismatch = existingToolConfig?.version && existingToolConfig.version !== CALENDAR_TOOL_VERSION
   const signatureMismatch = existingToolConfig?.signature && existingToolConfig.signature !== currentSignature
-  const mustRecreate = Boolean(versionMismatch || signatureMismatch)
+  const missingBookingFields = includeBookingTools && !liveToolHasBookingFields
+  const mustRecreate = Boolean(versionMismatch || signatureMismatch || missingBookingFields)
 
   if (mustRecreate) {
-    console.log('Recreating calendar tools', { versionMismatch, signatureMismatch, currentSignature, stored: existingToolConfig?.signature })
+    console.log('Recreating calendar tools', { versionMismatch, signatureMismatch, missingBookingFields, currentSignature, stored: existingToolConfig?.signature })
     await Promise.all([
       deleteVapiTool(existingToolConfig?.check_availability_id),
       deleteVapiTool(existingToolConfig?.book_appointment_id),
