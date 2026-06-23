@@ -75,7 +75,7 @@ const BookingOwnerNotificationEmail = ({
     </div>
     {callSummary && (
       <>
-        <Text style={styles.h2}>Call summary</Text>
+        <Text style={{ ...styles.text, fontWeight: 600 }}>Call summary</Text>
         <Text style={styles.text}>{callSummary}</Text>
       </>
     )}
