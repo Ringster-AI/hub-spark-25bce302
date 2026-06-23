@@ -48,7 +48,7 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.0'
+const CALENDAR_TOOL_VERSION = '2.1'
 
 type CalendarToolConfig = {
   version: string
