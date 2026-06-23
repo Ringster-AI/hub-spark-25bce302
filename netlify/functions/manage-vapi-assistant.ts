@@ -463,12 +463,15 @@ async function deleteVapiTool(toolId?: string | null) {
 async function upsertVapiTool(
   existingToolId: string | null | undefined,
   tool: any,
-  metadata?: Record<string, unknown>
+  _metadata?: Record<string, unknown>
 ): Promise<string> {
   const isUpdate = Boolean(existingToolId)
-  const toolWithMeta = metadata && Object.keys(metadata).length > 0
-    ? { ...tool, metadata: { ...(tool.metadata || {}), ...metadata } }
-    : tool
+  // NOTE: Vapi rejects a top-level `metadata` property on tool create/update
+  // ("property metadata should not exist"). We intentionally strip it here and
+  // ignore any caller-supplied metadata. Agent<->tool ownership is tracked via
+  // our DB (calendar_tools, agent_configs) and pruneAssistantStaleTools,
+  // not via Vapi-side metadata tagging.
+  const { metadata: _drop, ...toolClean } = (tool || {}) as Record<string, unknown>
 
   const res = await fetch(isUpdate ? `${VAPI_TOOL_URL}/${existingToolId}` : VAPI_TOOL_URL, {
     method: isUpdate ? 'PATCH' : 'POST',
@@ -476,7 +479,7 @@ async function upsertVapiTool(
       'Authorization': `Bearer ${VAPI_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(toolWithMeta),
+    body: JSON.stringify(toolClean),
   })
 
   if (!res.ok) {

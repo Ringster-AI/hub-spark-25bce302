@@ -53,9 +53,9 @@ export class VapiToolsService extends VapiBaseService {
       destinations,
     };
 
-    if (metadata && Object.keys(metadata).length > 0) {
-      toolConfig.metadata = metadata;
-    }
+    // NOTE: Vapi rejects a top-level `metadata` property on tool create
+    // ("property metadata should not exist"). Do not attach it here.
+
 
     console.log('Transfer tool configuration:', summarizeForLog(toolConfig));
 
