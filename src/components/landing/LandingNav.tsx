@@ -28,7 +28,7 @@ export const LandingNav = () => {
             <Button asChild size="sm"><Link to="/signup">Start Free Trial</Link></Button>
           </div>
 
-          <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label={mobileMenuOpen ? "Close menu" : "Open menu"} aria-expanded={mobileMenuOpen}>
             <Menu className="h-5 w-5" />
           </Button>
         </div>

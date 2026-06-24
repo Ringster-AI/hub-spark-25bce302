@@ -78,7 +78,7 @@ const Contact = () => {
       <div className="container mx-auto px-4 pt-32 pb-16">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-[#1A1F2C] mb-4">Contact Us</h1>
+            <h1 className="text-4xl font-bold text-[#1A1F2C] mb-4">Contact Ringster — Get Support for Your AI Receptionist</h1>
             <p className="text-lg text-[#403E43]">
               Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
             </p>
