@@ -349,7 +349,12 @@ export const AdminAgentsList = () => {
         </Table>
       </div>
 
-      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => {
+          if (!o && !deleteMutation.isPending) setPendingDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this agent?</AlertDialogTitle>
@@ -359,13 +364,30 @@ export const AdminAgentsList = () => {
               must be cleaned up separately. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteMutation.isPending && deleteStatus && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground border rounded-md p-3 bg-muted/40">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>{deleteStatus}</span>
+            </div>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={deleteMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete)}
+              onClick={(e) => {
+                e.preventDefault();
+                if (pendingDelete) deleteMutation.mutate(pendingDelete);
+              }}
             >
-              Delete agent
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                "Delete agent"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
