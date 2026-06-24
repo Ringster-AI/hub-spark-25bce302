@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Search, MoreHorizontal, Power, Trash2, Eye } from "lucide-react";
+import { Search, MoreHorizontal, Power, Trash2, Eye, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -112,16 +112,25 @@ export const AdminAgentsList = () => {
       toast({ title: "Failed to update", description: e.message, variant: "destructive" }),
   });
 
+  const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: async (agent: AdminAgentRow) => {
+      const progressToast = toast({
+        title: `Deleting ${agent.name}…`,
+        description: "Cleaning up Vapi assistant and tools.",
+      });
+      setDeleteStatus("Cleaning up Vapi assistant and tools…");
+
       // Best-effort: tell the Netlify function to delete the Vapi assistant
       // and its tools before we drop the DB row. Failure here is logged but
       // doesn't block the delete — the orphan sweep can clean up later.
+      let vapiWarning: string | null = null;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           const { getNetlifyFunctionsUrl } = await import("@/utils/netlifyFunctions");
-          await fetch(getNetlifyFunctionsUrl("manage-vapi-assistant"), {
+          const res = await fetch(getNetlifyFunctionsUrl("manage-vapi-assistant"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -129,20 +138,53 @@ export const AdminAgentsList = () => {
             },
             body: JSON.stringify({ agentId: agent.id, action: "delete" }),
           });
+          if (!res.ok) {
+            vapiWarning = `Vapi cleanup returned ${res.status}; orphan sweep will retry.`;
+            console.warn(vapiWarning);
+          }
         }
-      } catch (err) {
-        console.warn("Vapi cleanup failed before DB delete", err);
+      } catch (err: any) {
+        vapiWarning = `Vapi cleanup failed: ${err?.message ?? "unknown error"}. Orphan sweep will retry.`;
+        console.warn(vapiWarning, err);
       }
+
+      progressToast.update({
+        id: progressToast.id,
+        title: `Deleting ${agent.name}…`,
+        description: "Removing database records and cascading dependencies.",
+      });
+      setDeleteStatus("Removing database records…");
+
       const { error } = await supabase.from("agent_configs").delete().eq("id", agent.id);
       if (error) throw error;
+
+      progressToast.dismiss();
+      return { vapiWarning };
     },
-    onSuccess: () => {
-      toast({ title: "Agent deleted" });
+    onSuccess: (result, agent) => {
+      setDeleteStatus(null);
+      if (result.vapiWarning) {
+        toast({
+          title: `Agent "${agent.name}" deleted`,
+          description: result.vapiWarning,
+        });
+      } else {
+        toast({
+          title: `Agent "${agent.name}" deleted`,
+          description: "Vapi, Twilio links, and all dependent records cleaned up.",
+        });
+      }
       setPendingDelete(null);
       queryClient.invalidateQueries({ queryKey: ["admin-agents"] });
     },
-    onError: (e: any) =>
-      toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
+    onError: (e: any, agent) => {
+      setDeleteStatus(null);
+      toast({
+        title: `Failed to delete "${agent.name}"`,
+        description: e?.message ?? "Unknown error",
+        variant: "destructive",
+      });
+    },
   });
 
   const filtered = useMemo(() => {
@@ -307,7 +349,12 @@ export const AdminAgentsList = () => {
         </Table>
       </div>
 
-      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => {
+          if (!o && !deleteMutation.isPending) setPendingDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this agent?</AlertDialogTitle>
@@ -317,13 +364,30 @@ export const AdminAgentsList = () => {
               must be cleaned up separately. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteMutation.isPending && deleteStatus && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground border rounded-md p-3 bg-muted/40">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>{deleteStatus}</span>
+            </div>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={deleteMutation.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete)}
+              onClick={(e) => {
+                e.preventDefault();
+                if (pendingDelete) deleteMutation.mutate(pendingDelete);
+              }}
             >
-              Delete agent
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                "Delete agent"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
