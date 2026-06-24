@@ -112,16 +112,25 @@ export const AdminAgentsList = () => {
       toast({ title: "Failed to update", description: e.message, variant: "destructive" }),
   });
 
+  const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: async (agent: AdminAgentRow) => {
+      const progressToast = toast({
+        title: `Deleting ${agent.name}…`,
+        description: "Cleaning up Vapi assistant and tools.",
+      });
+      setDeleteStatus("Cleaning up Vapi assistant and tools…");
+
       // Best-effort: tell the Netlify function to delete the Vapi assistant
       // and its tools before we drop the DB row. Failure here is logged but
       // doesn't block the delete — the orphan sweep can clean up later.
+      let vapiWarning: string | null = null;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           const { getNetlifyFunctionsUrl } = await import("@/utils/netlifyFunctions");
-          await fetch(getNetlifyFunctionsUrl("manage-vapi-assistant"), {
+          const res = await fetch(getNetlifyFunctionsUrl("manage-vapi-assistant"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -129,20 +138,53 @@ export const AdminAgentsList = () => {
             },
             body: JSON.stringify({ agentId: agent.id, action: "delete" }),
           });
+          if (!res.ok) {
+            vapiWarning = `Vapi cleanup returned ${res.status}; orphan sweep will retry.`;
+            console.warn(vapiWarning);
+          }
         }
-      } catch (err) {
-        console.warn("Vapi cleanup failed before DB delete", err);
+      } catch (err: any) {
+        vapiWarning = `Vapi cleanup failed: ${err?.message ?? "unknown error"}. Orphan sweep will retry.`;
+        console.warn(vapiWarning, err);
       }
+
+      progressToast.update({
+        id: progressToast.id,
+        title: `Deleting ${agent.name}…`,
+        description: "Removing database records and cascading dependencies.",
+      });
+      setDeleteStatus("Removing database records…");
+
       const { error } = await supabase.from("agent_configs").delete().eq("id", agent.id);
       if (error) throw error;
+
+      progressToast.dismiss();
+      return { vapiWarning };
     },
-    onSuccess: () => {
-      toast({ title: "Agent deleted" });
+    onSuccess: (result, agent) => {
+      setDeleteStatus(null);
+      if (result.vapiWarning) {
+        toast({
+          title: `Agent "${agent.name}" deleted`,
+          description: result.vapiWarning,
+        });
+      } else {
+        toast({
+          title: `Agent "${agent.name}" deleted`,
+          description: "Vapi, Twilio links, and all dependent records cleaned up.",
+        });
+      }
       setPendingDelete(null);
       queryClient.invalidateQueries({ queryKey: ["admin-agents"] });
     },
-    onError: (e: any) =>
-      toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
+    onError: (e: any, agent) => {
+      setDeleteStatus(null);
+      toast({
+        title: `Failed to delete "${agent.name}"`,
+        description: e?.message ?? "Unknown error",
+        variant: "destructive",
+      });
+    },
   });
 
   const filtered = useMemo(() => {
