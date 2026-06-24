@@ -31,9 +31,9 @@
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.gpteng.co; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' data: https: blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.gpteng.co https://*.daily.co https://c.daily.co; script-src-elem 'self' 'unsafe-inline' https://cdn.gpteng.co https://*.daily.co https://c.daily.co; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' data: https: blob:; media-src 'self' blob: https:; font-src 'self' data:; frame-src 'self' https://*.daily.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Permissions-Policy = "camera=(), microphone=(self \"https://*.daily.co\"), geolocation=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     X-Content-Type-Options = "nosniff"
 
