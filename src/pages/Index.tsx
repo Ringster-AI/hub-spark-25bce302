@@ -133,6 +133,8 @@ const Index = () => {
               size="sm" 
               className="md:hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
             >
               <Menu className="h-5 w-5" />
             </Button>
