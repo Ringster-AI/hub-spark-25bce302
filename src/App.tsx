@@ -37,6 +37,7 @@ import AcceptInvite from "./pages/AcceptInvite";
 import Unsubscribe from "./pages/Unsubscribe";
 import EmailChangeCallback from "./pages/EmailChangeCallback";
 import OAuthConsent from "./pages/OAuthConsent";
+import ProgrammaticLanding from "./pages/ProgrammaticLanding";
 
 const queryClient = new QueryClient();
 
@@ -116,6 +117,38 @@ function App() {
             <Route path="/ai-receptionist-for-plumbers" element={<IndustryLanding industryKey="plumbers" />} />
             <Route path="/ai-receptionist-for-hvac" element={<IndustryLanding industryKey="hvac" />} />
             <Route path="/ai-receptionist-for-electricians" element={<IndustryLanding industryKey="electricians" />} />
+            {/* Programmatic hubs (9 new) + industry x city pages for all 12. React Router v6 needs
+                dynamic segments to occupy a whole path segment, so we enumerate industry slugs and
+                use :city for the city variant. ProgrammaticLanding reads the industry from the
+                explicit industryKey prop (hub) or matches useParams (city). */}
+            {[
+              ["plumbers", "plumbers"],
+              ["hvac", "hvac"],
+              ["electricians", "electricians"],
+              ["salons", "salons"],
+              ["cleaning", "cleaning"],
+              ["real-estate", "real-estate"],
+              ["law-firms", "law-firms"],
+              ["dentists", "dentists"],
+              ["general-contractors", "general-contractors"],
+              ["roofers", "roofers"],
+              ["landscapers", "landscapers"],
+              ["med-spas", "med-spas"],
+            ].map(([slug, key]) => (
+              <Route
+                key={`city-${slug}`}
+                path={`/ai-receptionist-for-${slug}/:city`}
+                element={<ProgrammaticLanding industryKey={key} />}
+              />
+            ))}
+            {/* Hub pages for the 9 new industries (existing 3 have their own hand-crafted routes above). */}
+            {["salons","cleaning","real-estate","law-firms","dentists","general-contractors","roofers","landscapers","med-spas"].map((slug) => (
+              <Route
+                key={`hub-${slug}`}
+                path={`/ai-receptionist-for-${slug}`}
+                element={<ProgrammaticLanding industryKey={slug} />}
+              />
+            ))}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/contact" element={<Contact />} />

@@ -2,6 +2,8 @@
 
 import { writeFileSync } from "fs";
 import { resolve } from "path";
+import { industries } from "../src/data/programmatic/industries";
+import { cities } from "../src/data/programmatic/cities";
 
 const BASE_URL = "https://getringster.com";
 
@@ -18,9 +20,6 @@ const staticEntries: SitemapEntry[] = [
   { path: "/how-it-works", changefreq: "monthly", priority: "0.8" },
   { path: "/pricing", changefreq: "weekly", priority: "0.9" },
   { path: "/faq", changefreq: "monthly", priority: "0.6" },
-  { path: "/ai-receptionist-for-plumbers", changefreq: "monthly", priority: "0.8" },
-  { path: "/ai-receptionist-for-hvac", changefreq: "monthly", priority: "0.8" },
-  { path: "/ai-receptionist-for-electricians", changefreq: "monthly", priority: "0.8" },
   { path: "/about", changefreq: "monthly", priority: "0.6" },
   { path: "/contact", changefreq: "monthly", priority: "0.5" },
   { path: "/blog", changefreq: "weekly", priority: "0.8" },
@@ -32,6 +31,22 @@ const staticEntries: SitemapEntry[] = [
   { path: "/login", changefreq: "yearly", priority: "0.3" },
   { path: "/signup", changefreq: "monthly", priority: "0.7" },
 ];
+
+// Industry hubs — one per industry (12 total, including the 3 hand-crafted plumbers/hvac/electricians pages).
+const industryHubEntries: SitemapEntry[] = Object.values(industries).map((i) => ({
+  path: `/ai-receptionist-for-${i.slug}`,
+  changefreq: "monthly",
+  priority: "0.8",
+}));
+
+// Programmatic industry x city pages — 12 industries x 100 cities = 1,200 entries.
+const industryCityEntries: SitemapEntry[] = Object.values(industries).flatMap((i) =>
+  cities.map((c) => ({
+    path: `/ai-receptionist-for-${i.slug}/${c.slug}`,
+    changefreq: "monthly" as const,
+    priority: "0.6",
+  })),
+);
 
 const blogSlugs: { slug: string; lastmod: string }[] = [
   { slug: "5-signs-your-business-needs-an-ai-phone-assistant-and-how-to-set-one-up-today", lastmod: "2025-03-10" },
@@ -80,6 +95,8 @@ const blogSlugs: { slug: string; lastmod: string }[] = [
 
 const entries: SitemapEntry[] = [
   ...staticEntries,
+  ...industryHubEntries,
+  ...industryCityEntries,
   ...blogSlugs.map((b) => ({
     path: `/blog/${b.slug}`,
     lastmod: b.lastmod,
