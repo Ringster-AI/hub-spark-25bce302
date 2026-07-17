@@ -131,6 +131,7 @@ function App() {
             <Route path="/team/accept-invite" element={<AcceptInvite />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/auth/email-change/callback" element={<EmailChangeCallback />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/onboarding" element={
               <PrivateRoute>
                 <Onboarding />

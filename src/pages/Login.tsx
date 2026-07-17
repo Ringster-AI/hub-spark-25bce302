@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,18 @@ import { track, identifyUser } from "@/lib/analytics";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rawNext = searchParams.get("next");
+  // Only honor same-origin, relative paths starting with a single "/".
+  const nextPath =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
+  const goNext = () => {
+    if (nextPath) {
+      window.location.href = nextPath;
+    } else {
+      navigate("/dashboard", { replace: true });
+    }
+  };
   const [checkingSession, setCheckingSession] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,14 +31,16 @@ export default function Login() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate("/dashboard", { replace: true });
+      if (session) goNext();
       setCheckingSession(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) navigate("/dashboard", { replace: true });
+      if (event === "SIGNED_IN" && session) goNext();
     });
     return () => subscription.unsubscribe();
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate, nextPath]);
+
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
