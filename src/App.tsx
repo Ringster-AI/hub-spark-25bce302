@@ -36,6 +36,7 @@ import AdminTools from "./pages/Admin/Tools/AdminTools";
 import AcceptInvite from "./pages/AcceptInvite";
 import Unsubscribe from "./pages/Unsubscribe";
 import EmailChangeCallback from "./pages/EmailChangeCallback";
+import OAuthConsent from "./pages/OAuthConsent";
 
 const queryClient = new QueryClient();
 
