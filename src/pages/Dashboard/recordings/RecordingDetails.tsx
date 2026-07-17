@@ -209,15 +209,23 @@ export const RecordingDetails = ({ recording }: RecordingDetailsProps) => {
                   </div>
                 </div>
 
-                {recording.recording_url ? (
+                {hasRecording ? (
                   <div className="bg-muted/30 p-6 rounded-lg space-y-4">
-                    <audio 
-                      ref={audioRef}
-                      src={recording.recording_url}
-                      onPlay={() => setIsPlaying(true)}
-                      onPause={() => setIsPlaying(false)}
-                      style={{ display: 'none' }}
-                    />
+                    {signedUrl ? (
+                      <audio
+                        ref={audioRef}
+                        src={signedUrl}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        style={{ display: 'none' }}
+                      />
+                    ) : signedUrlError ? (
+                      <p className="text-sm text-destructive">
+                        Recording is temporarily unavailable. Please try again.
+                      </p>
+                    ) : isSigningUrl ? (
+                      <p className="text-sm text-muted-foreground">Loading recording…</p>
+                    ) : null}
                     
                     {/* Waveform placeholder */}
                     <div className="h-24 bg-gradient-to-r from-primary/20 to-primary/5 rounded-lg flex items-center justify-center relative overflow-hidden">
