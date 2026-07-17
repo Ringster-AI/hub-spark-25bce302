@@ -61,7 +61,10 @@ export const useFirstCallCelebration = (): Result => {
         .eq("call_log_id", firstCall.id)
         .maybeSingle();
 
-      // Fire-and-forget celebration email (idempotent on call id)
+      // Fire-and-forget celebration email (idempotent on call id).
+      // We deliberately do NOT pass a raw Vapi recording URL — those now
+      // require an authenticated download and won't play from an email link.
+      // The template falls back to the dashboard recordings page.
       if (user.email) {
         supabase.functions
           .invoke("send-transactional-email", {
@@ -72,7 +75,7 @@ export const useFirstCallCelebration = (): Result => {
               templateData: {
                 fromNumber: firstCall.from_number,
                 duration: firstCall.duration,
-                recordingUrl: rec?.recording_url ?? undefined,
+                dashboardUrl: `https://ringster.ai/dashboard/recordings/${firstCall.id}`,
               },
             },
           })
