@@ -11,6 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { CallRecording, TranscriptSegment } from "./types";
 import { useTranscript } from "./useRecordings";
 import { useToast } from "@/hooks/use-toast";
+import { useSignedRecordingUrl } from "@/hooks/useSignedRecordingUrl";
 
 interface RecordingDetailsProps {
   recording: CallRecording | null;
@@ -26,6 +27,16 @@ export const RecordingDetails = ({ recording }: RecordingDetailsProps) => {
   const [volume, setVolume] = useState(1);
   const audioRef = useRef<HTMLAudioElement>(null);
   const { toast } = useToast();
+
+  // Vapi recordings now require an authenticated API call to fetch a
+  // short-lived signed URL — the raw `recording_url` in the database is no
+  // longer publicly playable.
+  const hasRecording = !!recording?.recording_url;
+  const {
+    data: signedUrl,
+    isLoading: isSigningUrl,
+    error: signedUrlError,
+  } = useSignedRecordingUrl(recording?.call_log_id, { enabled: hasRecording });
 
   // Mock data for demo - in production this would come from AI analysis
   const mockSentiment = Math.random() > 0.7 ? 'positive' : Math.random() > 0.4 ? 'neutral' : 'negative';
@@ -156,8 +167,16 @@ export const RecordingDetails = ({ recording }: RecordingDetailsProps) => {
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={!signedUrl}
                       onClick={() => {
-                        toast({ title: "Download started", description: "MP3 file will be downloaded shortly" });
+                        if (!signedUrl) return;
+                        const a = document.createElement("a");
+                        a.href = signedUrl;
+                        a.download = `ringster-call-${recording.call_log?.call_sid ?? recording.id}.mp3`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        toast({ title: "Download started", description: "Your recording is downloading." });
                       }}
                       className="flex items-center gap-2"
                     >
@@ -190,15 +209,23 @@ export const RecordingDetails = ({ recording }: RecordingDetailsProps) => {
                   </div>
                 </div>
 
-                {recording.recording_url ? (
+                {hasRecording ? (
                   <div className="bg-muted/30 p-6 rounded-lg space-y-4">
-                    <audio 
-                      ref={audioRef}
-                      src={recording.recording_url}
-                      onPlay={() => setIsPlaying(true)}
-                      onPause={() => setIsPlaying(false)}
-                      style={{ display: 'none' }}
-                    />
+                    {signedUrl ? (
+                      <audio
+                        ref={audioRef}
+                        src={signedUrl}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        style={{ display: 'none' }}
+                      />
+                    ) : signedUrlError ? (
+                      <p className="text-sm text-destructive">
+                        Recording is temporarily unavailable. Please try again.
+                      </p>
+                    ) : isSigningUrl ? (
+                      <p className="text-sm text-muted-foreground">Loading recording…</p>
+                    ) : null}
                     
                     {/* Waveform placeholder */}
                     <div className="h-24 bg-gradient-to-r from-primary/20 to-primary/5 rounded-lg flex items-center justify-center relative overflow-hidden">

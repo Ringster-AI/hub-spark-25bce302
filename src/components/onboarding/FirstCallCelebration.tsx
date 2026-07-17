@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, PhoneCall, Calendar, Users, Share2, Check } from "lucide-react";
 import { useFirstCallCelebration } from "@/hooks/useFirstCallCelebration";
+import { useSignedRecordingUrl } from "@/hooks/useSignedRecordingUrl";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
@@ -60,6 +61,11 @@ export const FirstCallCelebration = () => {
       track("First_Call_Received", { duration: call?.duration ?? null });
     }
   }, [shouldCelebrate, call?.duration]);
+
+  const hasRecording = !!call?.recordingUrl;
+  const { data: signedRecordingUrl } = useSignedRecordingUrl(call?.callId, {
+    enabled: !!call && hasRecording,
+  });
 
   if (!shouldCelebrate || !call) return null;
 
@@ -140,10 +146,10 @@ export const FirstCallCelebration = () => {
                 <Check className="h-3 w-3" /> Answered
               </span>
             </div>
-            {call.recordingUrl && (
+            {hasRecording && signedRecordingUrl && (
               <audio
                 controls
-                src={call.recordingUrl}
+                src={signedRecordingUrl}
                 className="mt-3 w-full"
                 preload="none"
               />
