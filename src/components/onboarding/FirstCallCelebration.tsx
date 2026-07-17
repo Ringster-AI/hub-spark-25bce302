@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, PhoneCall, Calendar, Users, Share2, Check } from "lucide-react";
 import { useFirstCallCelebration } from "@/hooks/useFirstCallCelebration";
+import { useSignedRecordingUrl } from "@/hooks/useSignedRecordingUrl";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
