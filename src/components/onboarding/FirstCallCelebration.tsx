@@ -62,6 +62,11 @@ export const FirstCallCelebration = () => {
     }
   }, [shouldCelebrate, call?.duration]);
 
+  const hasRecording = !!call?.recordingUrl;
+  const { data: signedRecordingUrl } = useSignedRecordingUrl(call?.callId, {
+    enabled: !!call && hasRecording,
+  });
+
   if (!shouldCelebrate || !call) return null;
 
   const hasCalendar = (integrations || []).some(
@@ -141,10 +146,10 @@ export const FirstCallCelebration = () => {
                 <Check className="h-3 w-3" /> Answered
               </span>
             </div>
-            {call.recordingUrl && (
+            {hasRecording && signedRecordingUrl && (
               <audio
                 controls
-                src={call.recordingUrl}
+                src={signedRecordingUrl}
                 className="mt-3 w-full"
                 preload="none"
               />
