@@ -37,6 +37,7 @@ import AcceptInvite from "./pages/AcceptInvite";
 import Unsubscribe from "./pages/Unsubscribe";
 import EmailChangeCallback from "./pages/EmailChangeCallback";
 import OAuthConsent from "./pages/OAuthConsent";
+import ProgrammaticLanding from "./pages/ProgrammaticLanding";
 
 const queryClient = new QueryClient();
 
@@ -116,6 +117,9 @@ function App() {
             <Route path="/ai-receptionist-for-plumbers" element={<IndustryLanding industryKey="plumbers" />} />
             <Route path="/ai-receptionist-for-hvac" element={<IndustryLanding industryKey="hvac" />} />
             <Route path="/ai-receptionist-for-electricians" element={<IndustryLanding industryKey="electricians" />} />
+            {/* Programmatic industry hubs (9 new industries) and industry x city pages for all 12 */}
+            <Route path="/ai-receptionist-for-:industry" element={<ProgrammaticLanding />} />
+            <Route path="/ai-receptionist-for-:industry/:city" element={<ProgrammaticLanding />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/contact" element={<Contact />} />
