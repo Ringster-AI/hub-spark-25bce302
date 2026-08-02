@@ -12,10 +12,18 @@ Deno.serve(async (req) => {
   const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
   try {
+    // Internal-only endpoint: require the service-role key (used by other edge functions).
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (!token || token !== SUPABASE_SERVICE_ROLE_KEY) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: jsonHeaders });
+    }
+
     const { owner_user_id, title, body, data } = await req.json();
     if (!owner_user_id) {
       return new Response(JSON.stringify({ error: "Missing owner_user_id" }), { status: 400, headers: jsonHeaders });
     }
+
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
