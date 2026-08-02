@@ -229,6 +229,17 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
 
+  // Authorize: platform-wide tool registration is admin-only
+  const { data: isSuper } = await adminSupabase.rpc('is_super_admin', { _user_id: user.id })
+  const { data: isAdmin } = await adminSupabase.rpc('has_role', { _user_id: user.id, _role: 'admin' })
+  if (!isSuper && !isAdmin) {
+    return new Response(JSON.stringify({ error: 'Forbidden: admin only' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+
   try {
     const vapiApiKey = Deno.env.get('VAPI_API_KEY')!
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
