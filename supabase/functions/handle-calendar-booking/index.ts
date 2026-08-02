@@ -182,8 +182,27 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // --- Authentication: require a valid signed-in user ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const authClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? "");
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const callerId = userData.user.id;
+
     const booking: BookingRequest = await req.json();
-    console.log("Processing calendar booking:", booking);
 
     if (!booking.campaign_id || !booking.contact_id || !booking.attendee_name || !booking.appointment_datetime) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -198,6 +217,34 @@ const handler = async (req: Request): Promise<Response> => {
       .select("id, user_id, agent_id")
       .eq("id", booking.campaign_id)
       .single();
+
+    // --- Authorization: caller must own the referenced campaign ---
+    if (!campaign) {
+      return new Response(JSON.stringify({ error: "Campaign not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (campaign.user_id !== callerId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Contact must belong to the same campaign
+    const { data: contact } = await supabase
+      .from("campaign_contacts")
+      .select("id, campaign_id")
+      .eq("id", booking.contact_id)
+      .maybeSingle();
+    if (!contact || contact.campaign_id !== booking.campaign_id) {
+      return new Response(JSON.stringify({ error: "Invalid contact for this campaign" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
 
     let calendarId: string | null = null;
     let calendarProvider: string | null = null;
