@@ -305,8 +305,43 @@ export function NextGenCampaignBuilder({ onClose }: NextGenCampaignBuilderProps)
 
   const handleLaunchCampaign = async () => {
     if (!campaignId) return;
-    
+
+    if (!consentAttested) {
+      toast({
+        title: "Consent attestation required",
+        description: "Confirm you have prior express consent for this list before launching.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in again to launch this campaign.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Record the consent attestation before any calls can be placed.
+      const { error: attestationError } = await supabase
+        .from("campaign_consent_attestations")
+        .insert({
+          campaign_id: campaignId,
+          user_id: session.user.id,
+          attested_by_email: session.user.email,
+          consent_source: consentSource,
+          consent_notes: consentNotes || null,
+          contact_count: contacts.length,
+          user_agent: navigator.userAgent,
+        });
+
+      if (attestationError) throw attestationError;
+
+
       // Save contacts to database first
       if (contacts.length > 0) {
         const { error: contactsError } = await supabase
