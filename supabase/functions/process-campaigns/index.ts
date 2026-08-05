@@ -202,23 +202,8 @@ Deno.serve(async (req) => {
   }
 });
 
-function isWithinBusinessHours(businessHours: any): boolean {
-  const now = new Date();
-  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-  const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
-  
-  // Check if current day is in business days
-  if (!businessHours.days.includes(currentDay)) {
-    return false;
-  }
-  
-  // Check if current time is within business hours
-  if (currentTime < businessHours.start || currentTime > businessHours.end) {
-    return false;
-  }
-  
-  return true;
-}
+
+
 
 async function makeOutboundCall(campaign: any, contact: Contact): Promise<boolean> {
   const outboundWebhookUrl = Deno.env.get('OUTBOUND_CALL_WEBHOOK');
