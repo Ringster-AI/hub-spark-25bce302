@@ -147,7 +147,25 @@ Deno.serve(async (req) => {
           while (cursor < contacts.length) {
             const idx = cursor++;
             const contact = contacts[idx];
+
+            // Guardrail: per-account Do Not Call suppression.
+            if (dncSet.has(normalizeForDnc(contact.phone_number))) {
+              console.log(`Contact ${contact.id} is on the DNC list — suppressing`);
+              await supabase
+                .from('campaign_contacts')
+                .update({ status: 'suppressed_dnc' })
+                .eq('id', contact.id);
+              continue;
+            }
+
+            // Guardrail: never dial outside 8am–9pm in the called party's local time.
+            if (!isWithinCalledPartyWindow(contact.phone_number, businessHours.timezone)) {
+              console.log(`Contact ${contact.id} is outside their local calling window — deferring`);
+              continue;
+            }
+
             try {
+
               const success = await makeOutboundCall(campaign, contact);
               await supabase
                 .from('campaign_contacts')
