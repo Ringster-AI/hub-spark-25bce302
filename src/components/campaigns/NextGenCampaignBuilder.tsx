@@ -49,6 +49,9 @@ export function NextGenCampaignBuilder({ onClose }: NextGenCampaignBuilderProps)
   const [campaignStatus, setCampaignStatus] = useState<'scheduled' | 'running' | 'paused' | 'completed'>('scheduled');
   const [scheduleType, setScheduleType] = useState<'now' | 'scheduled'>('now');
   const [scheduledDateTime, setScheduledDateTime] = useState<Date | null>(null);
+  const [consentAttested, setConsentAttested] = useState(false);
+  const [consentSource, setConsentSource] = useState('existing_customer');
+  const [consentNotes, setConsentNotes] = useState('');
   const [businessHours, setBusinessHours] = useState({
     start: '09:00',
     end: '17:00',
