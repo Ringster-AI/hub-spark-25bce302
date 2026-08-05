@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
         scheduled_start,
         config,
         agent_id,
+        user_id,
         agent_configs!inner(phone_number)
       `)
       .or('status.eq.running,and(status.eq.scheduled,scheduled_start.lte.' + new Date().toISOString() + ')');
