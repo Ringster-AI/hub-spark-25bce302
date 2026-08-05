@@ -560,6 +560,56 @@ export type Database = {
           },
         ]
       }
+      campaign_consent_attestations: {
+        Row: {
+          attested_at: string
+          attested_by_email: string | null
+          campaign_id: string
+          consent_notes: string | null
+          consent_source: string
+          contact_count: number
+          created_at: string
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          attested_at?: string
+          attested_by_email?: string | null
+          campaign_id: string
+          consent_notes?: string | null
+          consent_source: string
+          contact_count?: number
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          attested_at?: string
+          attested_by_email?: string | null
+          campaign_id?: string
+          consent_notes?: string | null
+          consent_source?: string
+          contact_count?: number
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_consent_attestations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_contacts: {
         Row: {
           call_attempts: number | null
@@ -892,6 +942,33 @@ export type Database = {
           message?: string | null
           phone?: string
           team_size?: string | null
+        }
+        Relationships: []
+      }
+      do_not_call_entries: {
+        Row: {
+          created_at: string
+          id: string
+          phone_number: string
+          reason: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          phone_number: string
+          reason?: string | null
+          source?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          phone_number?: string
+          reason?: string | null
+          source?: string
+          user_id?: string
         }
         Relationships: []
       }

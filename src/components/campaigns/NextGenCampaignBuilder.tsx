@@ -15,7 +15,8 @@ import {
   Calendar,
   MessageCircle,
   Target,
-  GitBranch
+  GitBranch,
+  ShieldCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +49,9 @@ export function NextGenCampaignBuilder({ onClose }: NextGenCampaignBuilderProps)
   const [campaignStatus, setCampaignStatus] = useState<'scheduled' | 'running' | 'paused' | 'completed'>('scheduled');
   const [scheduleType, setScheduleType] = useState<'now' | 'scheduled'>('now');
   const [scheduledDateTime, setScheduledDateTime] = useState<Date | null>(null);
+  const [consentAttested, setConsentAttested] = useState(false);
+  const [consentSource, setConsentSource] = useState('existing_customer');
+  const [consentNotes, setConsentNotes] = useState('');
   const [businessHours, setBusinessHours] = useState({
     start: '09:00',
     end: '17:00',
@@ -301,8 +305,43 @@ export function NextGenCampaignBuilder({ onClose }: NextGenCampaignBuilderProps)
 
   const handleLaunchCampaign = async () => {
     if (!campaignId) return;
-    
+
+    if (!consentAttested) {
+      toast({
+        title: "Consent attestation required",
+        description: "Confirm you have prior express consent for this list before launching.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in again to launch this campaign.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Record the consent attestation before any calls can be placed.
+      const { error: attestationError } = await supabase
+        .from("campaign_consent_attestations")
+        .insert({
+          campaign_id: campaignId,
+          user_id: session.user.id,
+          attested_by_email: session.user.email,
+          consent_source: consentSource,
+          consent_notes: consentNotes || null,
+          contact_count: contacts.length,
+          user_agent: navigator.userAgent,
+        });
+
+      if (attestationError) throw attestationError;
+
+
       // Save contacts to database first
       if (contacts.length > 0) {
         const { error: contactsError } = await supabase
@@ -604,32 +643,68 @@ export function NextGenCampaignBuilder({ onClose }: NextGenCampaignBuilderProps)
                     </div>
                   )}
 
-                  <div className="pt-4 border-t">
-                    <h4 className="font-medium mb-2">Compliance Check</h4>
-                    <div className="space-y-2">
-                      <label className="flex items-center space-x-2">
-                        <input type="checkbox" defaultChecked className="text-primary" />
-                        <span className="text-sm">Include call recording notice</span>
-                      </label>
-                      <label className="flex items-center space-x-2">
-                        <input type="checkbox" defaultChecked className="text-primary" />
-                        <span className="text-sm">Respect Do Not Call list</span>
-                      </label>
-                      <label className="flex items-center space-x-2">
-                        <input type="checkbox" defaultChecked className="text-primary" />
-                        <span className="text-sm">Follow business hours</span>
-                      </label>
+                  <div className="pt-4 border-t space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-primary" />
+                      <h4 className="font-medium">Consent attestation (required)</h4>
                     </div>
+
+                    <div>
+                      <label className="text-sm font-medium">How did you obtain consent?</label>
+                      <select
+                        value={consentSource}
+                        onChange={(e) => setConsentSource(e.target.value)}
+                        className="mt-1 w-full p-2 border rounded text-sm bg-background"
+                      >
+                        <option value="existing_customer">Existing customer / prior business relationship</option>
+                        <option value="web_form">Web form opt-in with disclosure</option>
+                        <option value="written_consent">Signed written consent</option>
+                        <option value="inbound_request">Caller requested a callback</option>
+                        <option value="other">Other (describe below)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium">Notes (optional)</label>
+                      <Input
+                        value={consentNotes}
+                        onChange={(e) => setConsentNotes(e.target.value)}
+                        placeholder="e.g. Opt-ins collected via booking form since Jan 2026"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <label className="flex items-start gap-2 rounded-lg border p-3 bg-accent/20 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={consentAttested}
+                        onChange={(e) => setConsentAttested(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        I confirm I have prior express consent to call every contact on this list, that I have
+                        scrubbed it against the National and internal Do Not Call lists, and that I am solely
+                        responsible for compliance with the TCPA and applicable state calling laws. Calls are
+                        recorded and disclosed, and will only be placed between 8:00am and 9:00pm in each
+                        contact's local time.
+                      </span>
+                    </label>
+
+                    <p className="text-xs text-muted-foreground">
+                      Ringster enforces the 8am–9pm local calling window and your Do Not Call suppression list
+                      automatically. Campaigns without an attestation on file will not dial.
+                    </p>
                   </div>
 
                   <Button 
                     onClick={handleLaunchCampaign} 
                     className="w-full bg-gradient-to-r from-primary to-primary-glow"
-                    disabled={scheduleType === 'scheduled' && !scheduledDateTime}
+                    disabled={!consentAttested || (scheduleType === 'scheduled' && !scheduledDateTime)}
                   >
                     <Play className="h-4 w-4 mr-2" />
                     {scheduleType === 'now' ? 'Launch Campaign' : 'Schedule Campaign'}
                   </Button>
+
                 </CardContent>
               </Card>
             </div>
