@@ -126,17 +126,39 @@ Deno.serve(async (req) => {
         }
 
         const config = campaign.config || {};
-        const businessHours = config.businessHours || {
-          start: '09:00',
-          end: '17:00',
-          timezone: 'America/New_York',
-          days: [1, 2, 3, 4, 5]
-        };
+        const businessHours = { ...DEFAULT_BUSINESS_HOURS, ...(config.businessHours || {}) };
+
+        // Guardrail: the campaign owner must have attested to having prior express
+        // consent for this list before a single call goes out.
+        const { count: attestationCount } = await supabase
+          .from('campaign_consent_attestations')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', campaign.id);
+
+        if (!attestationCount) {
+          console.warn(`Campaign ${campaign.id} has no consent attestation — pausing`);
+          await supabase
+            .from('campaigns')
+            .update({ status: 'paused' })
+            .eq('id', campaign.id);
+          return 0;
+        }
 
         if (!isWithinBusinessHours(businessHours)) {
           console.log(`Outside business hours for campaign ${campaign.id}, skipping`);
           return 0;
         }
+
+        // Load the owner's Do Not Call suppression list once per campaign.
+        const dncSet = new Set<string>();
+        if (campaign.user_id) {
+          const { data: dncRows } = await supabase
+            .from('do_not_call_entries')
+            .select('phone_number')
+            .eq('user_id', campaign.user_id);
+          for (const row of dncRows ?? []) dncSet.add(normalizeForDnc(row.phone_number));
+        }
+
 
         // Bounded concurrency across contacts within a single campaign.
         const CONCURRENCY = 5;
