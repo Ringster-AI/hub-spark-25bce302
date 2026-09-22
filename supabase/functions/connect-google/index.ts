@@ -100,15 +100,15 @@ serve(async (req) => {
       "https://www.googleapis.com/auth/calendar.freebusy",
     ];
 
-    // Get the return URL from the request if provided
-    let returnUrl;
+    // Get the return URL from the request if provided (validated against allowlist)
+    let requestedReturnUrl: unknown;
     try {
       const requestData = await req.json();
-      returnUrl = requestData.returnUrl;
+      requestedReturnUrl = requestData?.returnUrl;
     } catch (e) {
-      // If no JSON body or no returnUrl, use default
-      returnUrl = `${APP_URL}/dashboard/settings?tab=integrations`;
+      requestedReturnUrl = undefined;
     }
+    const returnUrl = sanitizeReturnUrl(requestedReturnUrl, requestId);
 
     console.log(`[${requestId}] Using return URL: ${returnUrl}`);
     
