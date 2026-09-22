@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { sanitizeReturnUrl } from "../_shared/return-url.ts";
 
 const CLIENT_ID = Deno.env.get("MICROSOFT_CLIENT_ID");
 const REDIRECT_URI = `${Deno.env.get("SUPABASE_URL") || ""}/functions/v1/microsoft-callback`;
@@ -78,13 +79,14 @@ serve(async (req) => {
       "Calendars.ReadWrite",
     ];
 
-    let returnUrl: string;
+    let requestedReturnUrl: unknown;
     try {
       const body = await req.json();
-      returnUrl = body.returnUrl || `${APP_URL}/dashboard/settings?tab=integrations`;
+      requestedReturnUrl = body?.returnUrl;
     } catch {
-      returnUrl = `${APP_URL}/dashboard/settings?tab=integrations`;
+      requestedReturnUrl = undefined;
     }
+    const returnUrl = sanitizeReturnUrl(requestedReturnUrl, requestId);
 
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);
