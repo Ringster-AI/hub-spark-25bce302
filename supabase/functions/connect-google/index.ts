@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { sanitizeReturnUrl } from "../_shared/return-url.ts";
 
 const CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
 const REDIRECT_URI = `${Deno.env.get("SUPABASE_URL") || ""}/functions/v1/google-callback`;
