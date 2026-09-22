@@ -66,7 +66,7 @@ export function createSuccessRedirect(
   tokenData: { scope: string },
   reqId: string
 ) {
-  const redirectUrl = new URL(returnUrl);
+  const redirectUrl = new URL(sanitizeReturnUrl(returnUrl, reqId));
   redirectUrl.searchParams.append("success", "true");
   redirectUrl.searchParams.append("email", userInfo.email);
   redirectUrl.searchParams.append("googleConnected", "true");
