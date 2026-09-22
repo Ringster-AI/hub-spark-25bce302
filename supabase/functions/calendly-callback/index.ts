@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { encryptToken, decryptToken } from "../_shared/crypto.ts";
+import { sanitizeReturnUrl } from "../_shared/return-url.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -117,7 +118,7 @@ serve(async (req) => {
     }
 
     const userId = stateData.user_id;
-    const returnUrl = stateData.return_url || `${APP_URL}/dashboard/settings?tab=integrations`;
+    const returnUrl = sanitizeReturnUrl(stateData.return_url);
 
     // Exchange code for tokens
     const tokenRes = await fetch("https://auth.calendly.com/oauth/token", {

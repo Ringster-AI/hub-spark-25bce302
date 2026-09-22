@@ -1,6 +1,7 @@
 
 
 import { corsHeaders } from "./cors.ts";
+import { sanitizeReturnUrl } from "./return-url.ts";
 
 const DEFAULT_APP_URL = "http://localhost:5173";
 
