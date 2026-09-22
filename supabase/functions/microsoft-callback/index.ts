@@ -4,6 +4,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { redirectWithError } from "../_shared/responses.ts";
 import { lookupOAuthState, deleteOAuthState } from "../_shared/supabase-admin.ts";
 import { encryptToken } from "../_shared/crypto.ts";
+import { sanitizeReturnUrl } from "../_shared/return-url.ts";
 
 const CLIENT_ID = Deno.env.get("MICROSOFT_CLIENT_ID");
 const CLIENT_SECRET = Deno.env.get("MICROSOFT_CLIENT_SECRET");
@@ -156,7 +157,7 @@ serve(async (req) => {
     await deleteOAuthState(state);
 
     // Redirect back to the app
-    const redirectUrl = new URL(returnUrl);
+    const redirectUrl = new URL(sanitizeReturnUrl(returnUrl, requestId));
     redirectUrl.searchParams.set("microsoft_connected", "true");
     redirectUrl.searchParams.set("email", userInfo.email);
 

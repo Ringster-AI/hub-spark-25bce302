@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { sanitizeReturnUrl } from "../_shared/return-url.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,14 +46,15 @@ serve(async (req) => {
       );
     }
 
-    // Get return URL
-    let returnUrl: string;
+    // Get return URL (validated against allowlist)
+    let requestedReturnUrl: unknown;
     try {
       const body = await req.json();
-      returnUrl = body.returnUrl || `${APP_URL}/dashboard/settings?tab=integrations`;
+      requestedReturnUrl = body?.returnUrl;
     } catch {
-      returnUrl = `${APP_URL}/dashboard/settings?tab=integrations`;
+      requestedReturnUrl = undefined;
     }
+    const returnUrl = sanitizeReturnUrl(requestedReturnUrl);
 
     // Generate state and store it
     const stateValue = crypto.randomUUID();

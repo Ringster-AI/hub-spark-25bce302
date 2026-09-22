@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { sanitizeReturnUrl } from "../_shared/return-url.ts";
 
 const CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID");
 const REDIRECT_URI = `${Deno.env.get("SUPABASE_URL") || ""}/functions/v1/google-callback`;
@@ -100,15 +101,15 @@ serve(async (req) => {
       "https://www.googleapis.com/auth/calendar.freebusy",
     ];
 
-    // Get the return URL from the request if provided
-    let returnUrl;
+    // Get the return URL from the request if provided (validated against allowlist)
+    let requestedReturnUrl: unknown;
     try {
       const requestData = await req.json();
-      returnUrl = requestData.returnUrl;
+      requestedReturnUrl = requestData?.returnUrl;
     } catch (e) {
-      // If no JSON body or no returnUrl, use default
-      returnUrl = `${APP_URL}/dashboard/settings?tab=integrations`;
+      requestedReturnUrl = undefined;
     }
+    const returnUrl = sanitizeReturnUrl(requestedReturnUrl, requestId);
 
     console.log(`[${requestId}] Using return URL: ${returnUrl}`);
     
