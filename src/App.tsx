@@ -184,6 +184,7 @@ function App() {
               <Route path="agents" element={<AdminAgentsList />} />
               <Route path="agents/:id" element={<AdminAgentDetail />} />
               <Route path="tools" element={<AdminTools />} />
+              <Route path="compliance" element={<AdminComplianceReview />} />
             </Route>
           </Routes>
           <CookieConsentBanner />
