@@ -33,6 +33,7 @@ import AdminLayout from "./pages/Admin/AdminLayout";
 import AdminAgentsList from "./pages/Admin/Agents/AdminAgentsList";
 import AdminAgentDetail from "./pages/Admin/Agents/AdminAgentDetail";
 import AdminTools from "./pages/Admin/Tools/AdminTools";
+import AdminComplianceReview from "./pages/Admin/Compliance/AdminComplianceReview";
 import AcceptInvite from "./pages/AcceptInvite";
 import Unsubscribe from "./pages/Unsubscribe";
 import EmailChangeCallback from "./pages/EmailChangeCallback";
