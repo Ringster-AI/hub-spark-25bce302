@@ -96,3 +96,6 @@ project_id = "owzerqaududhfwngyqbp"
 [studio]
   enabled = true
   port = 54324
+
+  [functions.analyze-call-compliance]
+    allow_public_network_access = true
