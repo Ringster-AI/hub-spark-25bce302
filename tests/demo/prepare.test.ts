@@ -8,7 +8,8 @@ const input = {
 function fixtures() {
   const store = {
     reserve: vi.fn<DemoStore['reserve']>().mockResolvedValue({ id: 'session', state: 'reserved', provider_call_id: null }),
-    claimDispatch: vi.fn().mockResolvedValue(true), record: vi.fn().mockResolvedValue(undefined),
+    claimDispatch: vi.fn().mockResolvedValue(true),
+    record: vi.fn<DemoStore['record']>().mockImplementation(async (id, state, provider_call_id) => ({ id, state, provider_call_id })),
   };
   const provider = { create: vi.fn().mockResolvedValue({ id: 'call', webCallUrl: 'https://example.invalid/room' }) };
   return { store, provider };

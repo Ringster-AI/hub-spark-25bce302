@@ -6,9 +6,9 @@ export type DemoSession = {
   provider_call_id: string | null;
 };
 export interface DemoStore {
-  reserve(userId: string, requestId: string): Promise<DemoSession>;
+  reserve(userId: string, requestId: string, business: DemoBusiness): Promise<DemoSession>;
   claimDispatch(sessionId: string): Promise<boolean>;
-  record(sessionId: string, state: 'ready' | 'failed_preconnect', callId: string | null, failure?: string): Promise<void>;
+  record(sessionId: string, state: 'ready' | 'failed_preconnect', callId: string | null, failure?: string): Promise<DemoSession>;
 }
 export interface DemoProvider {
   // An implementation MUST send only once. Creation cannot be automatically
@@ -27,7 +27,7 @@ export async function prepareDemoCall(input: {
     sessionId: 'validation', webhookUrl: input.webhookUrl, webhookSecret: input.webhookSecret,
   });
   const { store, provider } = dependencies;
-  const session = await store.reserve(input.userId, input.requestId);
+  const session = await store.reserve(input.userId, input.requestId, input.business);
   if (session.state !== 'reserved') {
     // Do not create again or return another caller's cached credentials.
     return { sessionId: session.id, state: session.state, webCallUrl: null };
@@ -52,6 +52,8 @@ export async function prepareDemoCall(input: {
   }
   // Persist the provider binding before allowing the browser to join.
   // A persistence failure must never refund or automatically re-create a call.
-  await store.record(session.id, 'ready', call.id);
-  return { sessionId: session.id, state: 'ready' as const, webCallUrl: call.webCallUrl };
+  const persisted = await store.record(session.id, 'ready', call.id);
+  // A fast final webhook may have already completed the session.
+  return { sessionId: session.id, state: persisted.state,
+    webCallUrl: persisted.state === 'ready' ? call.webCallUrl : null };
 }
