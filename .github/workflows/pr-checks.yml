@@ -1,0 +1,35 @@
+name: PR checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Unit and demo database tests
+        run: npm test
+      - name: Lint demo foundation
+        run: npx --no-install eslint netlify/functions/services/demo tests/demo vitest.config.ts
+      - name: Typecheck demo foundation
+        run: npx --no-install tsc -p tsconfig.demo.json
+      - name: Production build (no production configuration)
+        shell: bash
+        run: |
+          rm -f .env .env.local .env.production .env.production.local
+          npm run build
+        env:
+          VITE_SUPABASE_URL: https://example.invalid
+          VITE_SUPABASE_ANON_KEY: build-only-placeholder
