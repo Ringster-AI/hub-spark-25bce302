@@ -12,6 +12,7 @@ import AdminPartnerProspects from "./AdminPartnerProspects";
 import AdminDemoSettings from "./AdminDemoSettings";
 import AdminPartnerAttributions from "./AdminPartnerAttributions";
 import AdminPartnerPayouts from "./AdminPartnerPayouts";
+import AdminPartnerReporting from "./AdminPartnerReporting";
 
 const db = supabase as any;
 
@@ -107,6 +108,7 @@ export default function AdminPartners() {
           </Table>
         </CardContent>
       </Card>
+      <AdminPartnerReporting partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name ?? p.invite_email }))} />
       <AdminPartnerPayouts partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
       <AdminPartnerAttributions partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
       <AdminDemoSettings />
