@@ -48,7 +48,7 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.6'
+const CALENDAR_TOOL_VERSION = '2.7'
 
 type CalendarToolConfig = {
   version: string
@@ -56,6 +56,7 @@ type CalendarToolConfig = {
   check_availability_id?: string | null
   book_appointment_id?: string | null
   get_current_datetime_id?: string | null
+  send_sms_id?: string | null
 }
 
 type BookingFieldDef = {
