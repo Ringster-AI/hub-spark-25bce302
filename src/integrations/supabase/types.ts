@@ -3070,6 +3070,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      admin_create_manual_attribution: {
+        Args: {
+          p_account_email: string
+          p_partner: string
+          p_reason: string
+          p_type: string
+        }
+        Returns: string
+      }
       admin_invite_partner: {
         Args: {
           p_assisted_rate?: number
@@ -3081,6 +3090,15 @@ export type Database = {
       }
       admin_resolve_partner_flag: {
         Args: { p_flag_id: string; p_resolution: string; p_status: string }
+        Returns: undefined
+      }
+      admin_review_attribution: {
+        Args: {
+          p_action: string
+          p_id: string
+          p_reason: string
+          p_type: string
+        }
         Returns: undefined
       }
       admin_set_partner_payout: {
@@ -3105,6 +3123,15 @@ export type Database = {
       booking_tstzrange: {
         Args: { duration_min: number; start_time: string }
         Returns: unknown
+      }
+      claim_partner_attribution: {
+        Args: {
+          p_account: string
+          p_paid_at: string
+          p_prior_paid: boolean
+          p_stripe_customer: string
+        }
+        Returns: Json
       }
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
       create_phone_verification: {
@@ -3170,6 +3197,52 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       migrate_google_integrations: { Args: never; Returns: undefined }
       my_partner_access: { Args: never; Returns: Json }
+      partner_account_owner: { Args: { p_user: string }; Returns: string }
+      partner_insert_attribution: {
+        Args: {
+          p_account: string
+          p_approved_by: string
+          p_evidence: Json
+          p_kind: string
+          p_method: string
+          p_paid_at: string
+          p_partner: string
+          p_prospect: string
+          p_status: string
+          p_type: string
+        }
+        Returns: string
+      }
+      partner_is_self_referral: {
+        Args: {
+          p_account: string
+          p_partner: string
+          p_stripe_customer: string
+        }
+        Returns: string
+      }
+      partner_rate_for: {
+        Args: { p_partner: string; p_type: string }
+        Returns: {
+          commission_type: string
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          holding_annual_days: number
+          holding_monthly_days: number
+          id: string
+          months: number
+          partner_id: string
+          rate: number
+          reason: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "partner_rate_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       partner_sweep_protection: { Args: never; Returns: undefined }
       pn_business: { Args: { v: string }; Returns: string }
       pn_compact: { Args: { v: string }; Returns: string }
@@ -3177,6 +3250,15 @@ export type Database = {
       pn_email: { Args: { v: string }; Returns: string }
       pn_phone: { Args: { v: string }; Returns: string }
       process_campaign_contacts: { Args: never; Returns: undefined }
+      record_referral_touch: {
+        Args: {
+          p_code: string
+          p_landing_url: string
+          p_source: string
+          p_user_agent: string
+        }
+        Returns: Json
+      }
       register_partner_prospect: { Args: { p: Json }; Returns: Json }
       reset_monthly_credits: { Args: { p_user_id: string }; Returns: boolean }
       sync_user_subscription: {
