@@ -1878,6 +1878,51 @@ export type Database = {
           },
         ]
       }
+      partner_house_accounts: {
+        Row: {
+          business_name: string | null
+          created_at: string
+          created_by: string | null
+          domain: string | null
+          email: string | null
+          id: string
+          norm_business: string | null
+          norm_domain: string | null
+          norm_email: string | null
+          norm_phone: string | null
+          note: string | null
+          phone: string | null
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          domain?: string | null
+          email?: string | null
+          id?: string
+          norm_business?: string | null
+          norm_domain?: string | null
+          norm_email?: string | null
+          norm_phone?: string | null
+          note?: string | null
+          phone?: string | null
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          domain?: string | null
+          email?: string | null
+          id?: string
+          norm_business?: string | null
+          norm_domain?: string | null
+          norm_email?: string | null
+          norm_phone?: string | null
+          note?: string | null
+          phone?: string | null
+        }
+        Relationships: []
+      }
       partner_materials: {
         Row: {
           created_at: string
@@ -3034,6 +3079,10 @@ export type Database = {
         }
         Returns: string
       }
+      admin_resolve_partner_flag: {
+        Args: { p_flag_id: string; p_resolution: string; p_status: string }
+        Returns: undefined
+      }
       admin_set_partner_payout: {
         Args: {
           p_contact: string
@@ -3041,6 +3090,15 @@ export type Database = {
           p_method: string
           p_partner_id: string
           p_reason?: string
+        }
+        Returns: undefined
+      }
+      admin_set_prospect_protection: {
+        Args: {
+          p_action: string
+          p_new_partner: string
+          p_prospect_id: string
+          p_reason: string
         }
         Returns: undefined
       }
@@ -3112,7 +3170,14 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       migrate_google_integrations: { Args: never; Returns: undefined }
       my_partner_access: { Args: never; Returns: Json }
+      partner_sweep_protection: { Args: never; Returns: undefined }
+      pn_business: { Args: { v: string }; Returns: string }
+      pn_compact: { Args: { v: string }; Returns: string }
+      pn_domain: { Args: { v: string }; Returns: string }
+      pn_email: { Args: { v: string }; Returns: string }
+      pn_phone: { Args: { v: string }; Returns: string }
       process_campaign_contacts: { Args: never; Returns: undefined }
+      register_partner_prospect: { Args: { p: Json }; Returns: Json }
       reset_monthly_credits: { Args: { p_user_id: string }; Returns: boolean }
       sync_user_subscription: {
         Args: { p_plan_id?: string; p_user_id: string }
