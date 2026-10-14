@@ -39,6 +39,8 @@ import Unsubscribe from "./pages/Unsubscribe";
 import EmailChangeCallback from "./pages/EmailChangeCallback";
 import OAuthConsent from "./pages/OAuthConsent";
 import ProgrammaticLanding from "./pages/ProgrammaticLanding";
+import PartnerDashboard from "./pages/Partner";
+import AdminPartners from "./pages/Admin/Partners/AdminPartners";
 
 const queryClient = new QueryClient();
 const Demo = lazy(() => import('./pages/Demo'));
@@ -172,6 +174,7 @@ function App() {
                 <Onboarding />
               </PrivateRoute>
             } />
+            <Route path="/partner" element={<PrivateRoute><PartnerDashboard /></PrivateRoute>} />
             {import.meta.env.VITE_RINGSTER_DEMO_ENABLED === 'true' && <Route path="/demo" element={
               <PrivateRoute><Suspense fallback={<p role="status">Loading your demo…</p>}><Demo /></Suspense></PrivateRoute>
             } />}
@@ -190,6 +193,7 @@ function App() {
               <Route path="agents/:id" element={<AdminAgentDetail />} />
               <Route path="tools" element={<AdminTools />} />
               <Route path="compliance" element={<AdminComplianceReview />} />
+              <Route path="partners" element={<AdminPartners />} />
             </Route>
           </Routes>
           <CookieConsentBanner />
