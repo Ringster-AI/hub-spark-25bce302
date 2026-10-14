@@ -59,7 +59,7 @@ export default function PartnerDashboard() {
       });
       const latest: Record<string, any> = {};
       (rates.data ?? []).forEach((r: any) => (latest[r.commission_type] ??= r));
-      return { byStatus, totals, rates: latest, payout: me.data, history: (commissions.data ?? []).slice(0, 50) };
+      return { byStatus, totals, rates: latest, payout: me.data, history: (commissions.data ?? []).slice(0, 50), report, monthly };
     },
   });
 
