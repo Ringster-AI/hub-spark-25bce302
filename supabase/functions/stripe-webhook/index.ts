@@ -46,6 +46,15 @@ serve(async (req) => {
 
     console.log(`🔔 Event received: ${event.type}`);
 
+    // Event dedupe (separate from commission ledger uniqueness)
+    const { data: seen } = await supabase.from('stripe_webhook_events').select('status').eq('stripe_event_id', event.id).maybeSingle();
+    if (seen?.status === 'processed') {
+      return new Response(JSON.stringify({ received: true, duplicate: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (!seen) await supabase.from('stripe_webhook_events').insert({ stripe_event_id: event.id, type: event.type });
+    const markEvent = (status: 'processed' | 'failed', error?: string) =>
+      supabase.from('stripe_webhook_events').update({ status, processed_at: new Date().toISOString(), error: error ?? null }).eq('stripe_event_id', event.id);
+
     // Helper: fire-and-forget transactional email
     async function sendEmail(templateName: string, recipientEmail: string, idempotencyKey: string, templateData: Record<string, unknown> = {}) {
       try {
@@ -93,6 +102,51 @@ serve(async (req) => {
       });
       if (error) throw error;
       console.log('partner attribution', JSON.stringify(data));
+    }
+
+    // Commission ledger: one entry per eligible subscription line (ledger key = invoice + line).
+    async function recordPartnerCommissions(invoice: any) {
+      const uid = await resolveAccount(invoice.customer as string, invoice.subscription as string);
+      if (!uid) return;
+      const { data: owner } = await supabase.rpc('partner_account_owner', { p_user: uid });
+      const account = owner ?? uid;
+      const { data: cfg } = await supabase.from('partner_program_config').select('excluded_price_ids').maybeSingle();
+      const excludedPrices: string[] = cfg?.excluded_price_ids ?? [];
+      const occurred = new Date(((invoice.status_transitions?.paid_at) ?? invoice.created) * 1000).toISOString();
+      let lines = invoice.lines?.data ?? [];
+      if (invoice.lines?.has_more) {
+        lines = (await stripe.invoices.listLineItems(invoice.id, { limit: 100 })).data;
+      }
+      for (const line of lines) {
+        const price = line.price;
+        if (line.type !== 'subscription' && !line.proration) continue;
+        if (!price?.recurring) continue; // one-time items (credit top-ups) excluded
+        if (price.recurring.usage_type === 'metered') continue; // usage overages excluded
+        if (excludedPrices.includes(price.id)) continue; // e.g. number rental
+        const { data: plan } = await supabase.from('subscription_plans')
+          .select('is_pay_as_you_go').eq('stripe_price_id', price.id).maybeSingle();
+        if (!plan || plan.is_pay_as_you_go) continue; // only known recurring base plans
+        const discounts = (line.discount_amounts ?? []).reduce((s: number, d: any) => s + (d.amount ?? 0), 0);
+        const gross = (line.amount ?? 0) - discounts; // pre-tax
+        if (gross === 0) continue;
+        const { error } = await supabase.rpc('record_partner_commission_line', {
+          p_account: account, p_event: event.id, p_invoice: invoice.id, p_line: line.id,
+          p_gross: gross, p_excluded: 0, p_currency: invoice.currency, p_interval: price.recurring.interval, p_occurred: occurred,
+        });
+        if (error) throw error;
+      }
+    }
+
+    async function reverseCommission(key: string, source: string, objectId: string, invoiceId: string | null, amount: number, sign: 1 | -1) {
+      if (!invoiceId) return;
+      const inv: any = await stripe.invoices.retrieve(invoiceId);
+      const base = inv.amount_paid || inv.total;
+      if (!base) return;
+      const { error } = await supabase.rpc('record_partner_commission_reversal', {
+        p_ledger_key: key, p_source: source, p_event: event.id, p_object: objectId, p_invoice: invoiceId,
+        p_ratio: sign * Math.min(1, amount / base), p_occurred: new Date().toISOString(),
+      });
+      if (error) throw error;
     }
 
     switch (event.type) {
@@ -175,16 +229,15 @@ serve(async (req) => {
         break;
       }
 
+      case 'invoice.paid':
       case 'invoice.payment_succeeded': {
         const invoice: any = event.data.object;
         // Partner attribution: claimed on the first eligible paid subscription invoice
         if (invoice.subscription && (invoice.amount_paid ?? 0) > 0) {
-          try {
-            await claimPartnerAttribution(invoice);
-          } catch (e) {
-            console.error('partner attribution failed', e);
-          }
+          await claimPartnerAttribution(invoice);
+          await recordPartnerCommissions(invoice);
         }
+        if (event.type === 'invoice.paid') break;
         if (invoice.billing_reason !== 'subscription_cycle') break;
         const customerId = invoice.customer as string;
         const customer = await stripe.customers.retrieve(customerId);
@@ -219,6 +272,36 @@ serve(async (req) => {
         break;
       }
 
+      case 'credit_note.created': {
+        const cn: any = event.data.object;
+        await reverseCommission(`cn:${cn.id}`, 'credit_note_line', cn.id, cn.invoice, cn.subtotal_excluding_tax ?? cn.subtotal ?? cn.amount, -1);
+        break;
+      }
+
+      case 'charge.refunded': {
+        const charge: any = event.data.object;
+        if (!charge.invoice) break;
+        const notes = await stripe.creditNotes.list({ invoice: charge.invoice, limit: 100 });
+        const noteRefunds = new Set(notes.data.map((n: any) => n.refund).filter(Boolean));
+        for (const rf of charge.refunds?.data ?? []) {
+          if (noteRefunds.has(rf.id)) continue; // already reversed via its credit note
+          await reverseCommission(`rf:${rf.id}`, 'refund', rf.id, charge.invoice, rf.amount, -1);
+        }
+        break;
+      }
+
+      case 'charge.dispute.created':
+      case 'charge.dispute.closed': {
+        const dispute: any = event.data.object;
+        const charge: any = await stripe.charges.retrieve(dispute.charge);
+        if (event.type === 'charge.dispute.created') {
+          await reverseCommission(`dp:${dispute.id}`, 'dispute', dispute.id, charge.invoice, dispute.amount, -1);
+        } else if (dispute.status === 'won') {
+          await reverseCommission(`dpw:${dispute.id}`, 'dispute', dispute.id, charge.invoice, dispute.amount, 1);
+        }
+        break;
+      }
+
       case 'checkout.session.completed': {
         const session: any = event.data.object;
         if (session.mode !== 'payment' || session.metadata?.type !== 'credit_addon') break;
@@ -243,6 +326,7 @@ serve(async (req) => {
     }
 
 
+    await markEvent('processed');
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
