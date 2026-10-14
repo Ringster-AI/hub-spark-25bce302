@@ -6,8 +6,9 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"],
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client"],
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["netlify/functions/services/demo/**/*.ts", "netlify/functions/demo-*.ts", "tests/demo/**/*.ts", "vitest.config.ts"]
+  "include": ["netlify/functions/services/demo/**/*.ts", "netlify/functions/demo-*.ts", "tests/demo/**/*.ts", "tests/demo/**/*.tsx", "src/features/demo/**/*.ts", "src/pages/Demo.tsx", "vitest.config.ts"]
 }

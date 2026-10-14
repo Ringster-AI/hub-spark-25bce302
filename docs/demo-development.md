@@ -115,9 +115,9 @@ https://docs.vapi.ai/calls/customer-join-timeout
    unexpected contradictory report must be investigated, not auto-refunded.
 6. Confirm the provider actually enforces maxDurationSeconds. The database
    stores policy and usage evidence; it cannot stop a remote call itself.
-7. Build browser start/end/recovery controls, visible remaining allowance,
-   transcript-backed results, and activation entry. Test microphone denial,
-   disconnect, refresh, slow reports, and end-of-call cleanup.
+7. Exercise the browser start/end/recovery controls with live staging audio,
+   including microphone denial, disconnect, refresh, slow reports, Safari
+   autoplay, multiple tabs and end-of-call cleanup.
 8. Keep demos out of ordinary call_logs, credit deductions, lead creation,
    real appointments, transfers and notifications. Enforce quotas on the
    server even if a browser is modified; do not implement demos merely by
@@ -125,3 +125,46 @@ https://docs.vapi.ai/calls/customer-join-timeout
 
 No deployment, migration execution, provider spend or recurring automation is
 part of this foundation change.
+
+## Browser experience
+
+The `/demo` route and onboarding entry are present only when the build has
+`VITE_RINGSTER_DEMO_ENABLED=true`. The server flag remains independently required.
+Keep both off in production until the staging checks above are complete.
+The browser calls same-origin Netlify functions; use Netlify dev or a complete
+staging deployment, not a Vite-only server or a cross-origin function override.
+
+The form collects six business facts, checks microphone permission before
+reservation, and joins only the room returned by the server. Daily is a direct,
+pinned dependency matching the existing Vapi SDK's transport version. The page
+does not create calls with the public Vapi key. It announces audio readiness only
+after playback succeeds and offers an Enable audio control when autoplay fails.
+Leaving the page or ending the demo destroys the call object and audio players.
+An additional browser timer ends the session after 120 seconds of listening;
+the provider's server-side duration limit remains authoritative.
+
+Pending sessions are discovered on load. Check demo status / result retrieves
+provider-backed state and transcripts; Resume available demo joins only a room
+still reported ready. A connected call in another tab is not joined. A failed
+preparation retains the request identity and business snapshot for safe retry.
+Room URLs and transcripts are not placed in browser storage or analytics.
+Results show the transcript verbatim as escaped text, not a fabricated lead or
+qualification summary. Plan and setup links do not activate a production agent.
+
+Manual staging walkthrough:
+
+1. Sign in with a verified staging account and visit `/demo`.
+2. Enter a fictional home-service business. Deny microphone permission; confirm
+   no attempt was reserved. Allow access and start once, including rapid clicks.
+3. Play a customer asking for service and a callback with fictional details.
+   Check audible greeting, two-way audio, mobile End demo access, and mic release.
+4. Check the result until the transcript arrives. Confirm it matches the call.
+5. Refresh during connection and exercise recovery; never infer a refund merely
+   from a timeout. Confirm another tab cannot reserve a parallel attempt.
+6. Use three connected calls and confirm a fourth is rejected server-side.
+7. Confirm paid credits, production agents, phone routing, bookings and outbound
+   notifications are unchanged. Test the feature flags off before release.
+
+Automated UI and transport tests use mocks. Desktop (1440px) and mobile (390px)
+layout checks used a local browser with mocked auth/API and no live service calls.
+These checks do not establish real Vapi audio or webhook compatibility.
