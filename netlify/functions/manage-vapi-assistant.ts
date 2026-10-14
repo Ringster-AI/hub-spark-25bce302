@@ -793,6 +793,7 @@ export const handler: Handler = async (event) => {
         deleteVapiTool(calendarCfg?.check_availability_id),
         deleteVapiTool(calendarCfg?.book_appointment_id),
         deleteVapiTool(calendarCfg?.get_current_datetime_id),
+        deleteVapiTool(calendarCfg?.send_sms_id),
       ])
       // Sweep anything else still tagged for this agent.
       await reconcileAgentTools(agentId, [])
@@ -1093,6 +1094,7 @@ export const handler: Handler = async (event) => {
         calendarToolConfig.check_availability_id,
         calendarToolConfig.book_appointment_id,
         calendarToolConfig.get_current_datetime_id,
+        calendarToolConfig.send_sms_id,
       ]
 
       // Reconcile: delete any Vapi tools tagged with this agent that are no
