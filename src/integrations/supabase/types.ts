@@ -3293,6 +3293,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      partner_report: {
+        Args: { p_partner?: string }
+        Returns: {
+          active_customers: number
+          business_name: string
+          churned_customers: number
+          collected_revenue_cents: number
+          commission_ratio: number
+          credited_customers: number
+          currency: string
+          net_commission_cents: number
+          partner_id: string
+          pending_commission_cents: number
+          retention_rate: number
+        }[]
+      }
+      partner_report_monthly: {
+        Args: { p_months?: number; p_partner?: string }
+        Returns: {
+          collected_revenue_cents: number
+          commission_cents: number
+          month: string
+          new_customers: number
+        }[]
+      }
       partner_sweep_protection: { Args: never; Returns: undefined }
       pn_business: { Args: { v: string }; Returns: string }
       pn_compact: { Args: { v: string }; Returns: string }
