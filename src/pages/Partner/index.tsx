@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Copy, ArrowLeft } from "lucide-react";
+import PartnerProspects from "./PartnerProspects";
 
 type Access = {
   state: "none" | "suspended" | "needs_agreement" | "active";
@@ -168,9 +169,10 @@ export default function PartnerDashboard() {
             {summary?.rates.closed && <p>Partner closed: {(summary.rates.closed.rate * 100).toFixed(0)}% for {summary.rates.closed.months} months</p>}
             <p>Payout method: {summary?.payout?.payout_method ? ({ interac_etransfer: "Interac e-transfer", wise: "Wise", paypal: "PayPal", wire: "Wire transfer" } as Record<string, string>)[summary.payout.payout_method] ?? summary.payout.payout_method : "Not set yet. Ringster will contact you."}</p>
             <p>Payouts are made on the 15th of each month for approved commission (minimum $50; smaller balances roll forward). Holding period: 30 days for monthly plans, 45 days for annual plans.</p>
-            <p className="text-muted-foreground">Ringster sets the commission type from your documented sales activity. Prospect registration, demo booking and sales materials are coming next.</p>
+            <p className="text-muted-foreground">Ringster sets the commission type from your documented sales activity. Demo booking and sales materials are coming next.</p>
           </CardContent>
         </Card>
+        <PartnerProspects />
       </div>
     </div>
   );
