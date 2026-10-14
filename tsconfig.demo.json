@@ -9,5 +9,5 @@
     "types": ["node"],
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["netlify/functions/services/demo/**/*.ts", "tests/demo/**/*.ts", "vitest.config.ts"]
+  "include": ["netlify/functions/services/demo/**/*.ts", "netlify/functions/demo-*.ts", "tests/demo/**/*.ts", "vitest.config.ts"]
 }

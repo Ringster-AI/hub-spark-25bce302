@@ -28,10 +28,11 @@ beforeAll(async () => {
     GRANT USAGE ON SCHEMA auth TO authenticated;
   `);
   await db.exec(readFileSync(new URL('../../supabase/migrations/20261013010000_demo_call_sessions.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../../supabase/migrations/20261013020000_demo_call_evidence.sql', import.meta.url), 'utf8'));
 }, 30000);
 
 beforeEach(async () => {
-  await db.exec('RESET ROLE; TRUNCATE demo_call_sessions; DELETE FROM auth.users;');
+  await db.exec('RESET ROLE; TRUNCATE demo_call_sessions CASCADE; DELETE FROM auth.users;');
   await db.query('INSERT INTO auth.users VALUES ($1, now()), ($2, now())', [owner, other]);
 });
 afterAll(async () => { await db?.close(); });
@@ -134,5 +135,37 @@ describe('demo allowance enforced by PostgreSQL', () => {
     await reserve();
     await expect(db.query('INSERT INTO demo_call_sessions (user_id, request_id) VALUES ($1, $2)', [owner, randomUUID()]))
       .rejects.toThrow('demo_call_sessions_one_pending_idx');
+  });
+
+  it('freezes business details for a request even across retries', async () => {
+    const request = randomUUID();
+    const reserveWith = (name: string) => db.query<Session>('SELECT * FROM reserve_demo_call_with_business($1,$2,$3)', [owner, request, { businessName: name }]);
+    const first = (await reserveWith('Maple')).rows[0];
+    expect((await reserveWith('Maple')).rows[0].id).toBe(first.id);
+    await expect(reserveWith('Different business')).rejects.toThrow('demo_request_configuration_mismatch');
+  });
+
+  it('atomically stores final evidence and acknowledges an inbox item once', async () => {
+    const session = await reserve();
+    const event = randomUUID();
+    await db.query('INSERT INTO demo_call_inbox(id,event_key,session_id,provider_call_id) VALUES ($1,$2,$3,$4)', [event, 'event', session.id, 'call']);
+    await db.query("SELECT apply_demo_call_evidence($1,'completed',42,NULL,$2)", [event, 'Customer: My sink leaks.']);
+    await db.query("SELECT apply_demo_call_evidence($1,'completed',42,NULL,$2)", [event, 'Duplicate must not replace original.']);
+    expect((await db.query<{ transcript: string }>('SELECT transcript FROM demo_call_results')).rows[0].transcript).toBe('Customer: My sink leaks.');
+    expect((await db.query('SELECT id FROM demo_call_inbox WHERE processed_at IS NOT NULL')).rows).toHaveLength(1);
+    await db.query("SELECT set_config('request.jwt.claim.sub', $1, false)", [other]);
+    await db.exec('SET ROLE authenticated');
+    expect((await db.query('SELECT * FROM demo_call_results')).rows).toHaveLength(0);
+    await expect(db.query('SELECT * FROM demo_call_inbox')).rejects.toThrow('permission denied');
+  });
+
+  it('leaves the inbox pending if applying evidence fails', async () => {
+    const session = await reserve();
+    await record(session.id, 'connected', 'real-call');
+    const event = randomUUID();
+    await db.query('INSERT INTO demo_call_inbox(id,event_key,session_id,provider_call_id) VALUES ($1,$2,$3,$4)', [event, 'bad-event', session.id, 'wrong-call']);
+    await expect(db.query("SELECT apply_demo_call_evidence($1,'completed',42,NULL,NULL)", [event])).rejects.toThrow('demo_provider_call_mismatch');
+    expect((await db.query('SELECT id FROM demo_call_inbox WHERE processed_at IS NULL')).rows).toHaveLength(1);
+    expect((await db.query('SELECT * FROM demo_call_results')).rows).toHaveLength(0);
   });
 });
