@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabaseConfig } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
-const SUPABASE_URL = "https://owzerqaududhfwngyqbp.supabase.co";
-const SUPABASE_ANON_KEY = (supabase as any).supabaseKey as string;
+const SUPABASE_URL = supabaseConfig.url;
+const SUPABASE_ANON_KEY = supabaseConfig.key;
 
 type State = "loading" | "ready" | "success" | "error";
 

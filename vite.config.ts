@@ -4,12 +4,15 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
+import { readSupabaseConfig } from './src/integrations/supabase/config';
 
 
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '');
+  // Fail before emitting a bundle when the deployment has no project configuration.
+  readSupabaseConfig(env);
   
   return {
     server: {
