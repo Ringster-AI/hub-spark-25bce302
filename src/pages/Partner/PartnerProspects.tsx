@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, MessageSquarePlus } from "lucide-react";
+import { Plus, MessageSquarePlus, CalendarPlus } from "lucide-react";
+import BookDemoDialog from "./BookDemoDialog";
 
 const db = supabase as any;
 
@@ -34,6 +35,7 @@ export default function PartnerProspects() {
   const [form, setForm] = useState({ ...EMPTY });
   const [saving, setSaving] = useState(false);
   const [logFor, setLogFor] = useState<any>(null);
+  const [demoFor, setDemoFor] = useState<any>(null);
   const [act, setAct] = useState({ type: "call", summary: "", next_action: "" });
 
   const { data: prospects = [] } = useQuery({
@@ -131,6 +133,8 @@ export default function PartnerProspects() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" variant="ghost" onClick={() => setLogFor(p)}><MessageSquarePlus className="h-4 w-4 mr-1" />Log outreach</Button>
+                        {p.protection_status === "protected" && ["registered","contacted","qualified"].includes(p.status) &&
+                          <Button size="sm" variant="ghost" onClick={() => setDemoFor(p)}><CalendarPlus className="h-4 w-4 mr-1" />Book demo</Button>}
                       </TableCell>
                     </TableRow>
                   );
@@ -195,6 +199,7 @@ export default function PartnerProspects() {
           <DialogFooter><Button onClick={logActivity}>Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+      <BookDemoDialog prospect={demoFor} onClose={() => setDemoFor(null)} onBooked={refresh} />
     </Card>
   );
 }

@@ -4,5 +4,5 @@
 - [x] Stage 2 Prospects & pipeline: register-prospect, matching, activities, flags
 - [x] Stage 3 Attribution: resolver, precedence, first-paid claim, relationship checks
 - [x] Stage 4 Commissions: webhook dedupe, ledger, refunds/disputes, payouts
-- [ ] Stage 5 Demo scheduler: holds, overlap constraint, Google events
+- [x] Stage 5 Demo scheduler: holds, overlap constraint, Google events
 - [ ] Stage 6 Dashboards & reporting, pilot
