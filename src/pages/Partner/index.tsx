@@ -40,10 +40,11 @@ export default function PartnerDashboard() {
     queryKey: ["partner-summary", access?.partner_id],
     enabled: active,
     queryFn: async () => {
-      const [prospects, commissions, rates] = await Promise.all([
+      const [prospects, commissions, rates, me] = await Promise.all([
         db.from("partner_prospects").select("status"),
         db.from("partner_commissions").select("status, amount_cents"),
         db.from("partner_rate_versions").select("commission_type, rate, months, effective_from").order("effective_from", { ascending: false }),
+        db.from("partners").select("payout_method, country").eq("id", access!.partner_id).maybeSingle(),
       ]);
       const byStatus: Record<string, number> = {};
       (prospects.data ?? []).forEach((p: any) => (byStatus[p.status] = (byStatus[p.status] ?? 0) + 1));
@@ -55,7 +56,7 @@ export default function PartnerDashboard() {
       });
       const latest: Record<string, any> = {};
       (rates.data ?? []).forEach((r: any) => (latest[r.commission_type] ??= r));
-      return { byStatus, totals, rates: latest };
+      return { byStatus, totals, rates: latest, payout: me.data };
     },
   });
 
@@ -165,6 +166,8 @@ export default function PartnerDashboard() {
           <CardContent className="text-sm space-y-1">
             {summary?.rates.assisted && <p>Referral assisted: {(summary.rates.assisted.rate * 100).toFixed(0)}% for {summary.rates.assisted.months} months</p>}
             {summary?.rates.closed && <p>Partner closed: {(summary.rates.closed.rate * 100).toFixed(0)}% for {summary.rates.closed.months} months</p>}
+            <p>Payout method: {summary?.payout?.payout_method ? ({ interac_etransfer: "Interac e-transfer", wise: "Wise", paypal: "PayPal", wire: "Wire transfer" } as Record<string, string>)[summary.payout.payout_method] ?? summary.payout.payout_method : "Not set yet. Ringster will contact you."}</p>
+            <p>Payouts are made on the 15th of each month for approved commission (minimum $50; smaller balances roll forward). Holding period: 30 days for monthly plans, 45 days for annual plans.</p>
             <p className="text-muted-foreground">Ringster sets the commission type from your documented sales activity. Prospect registration, demo booking and sales materials are coming next.</p>
           </CardContent>
         </Card>
