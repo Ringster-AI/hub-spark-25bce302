@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import AdminPartnerProspects from "./AdminPartnerProspects";
+import AdminDemoSettings from "./AdminDemoSettings";
 import AdminPartnerAttributions from "./AdminPartnerAttributions";
 import AdminPartnerPayouts from "./AdminPartnerPayouts";
 
@@ -99,6 +100,7 @@ export default function AdminPartners() {
       </Card>
       <AdminPartnerPayouts partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
       <AdminPartnerAttributions partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
+      <AdminDemoSettings />
       <AdminPartnerProspects partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
     </div>
   );
