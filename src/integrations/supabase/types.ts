@@ -1982,6 +1982,7 @@ export type Database = {
       partner_program_config: {
         Row: {
           activity_deadline_days: number
+          approved_payout_methods: string[]
           default_assisted_rate: number
           default_closed_rate: number
           default_months: number
@@ -1999,6 +2000,7 @@ export type Database = {
         }
         Insert: {
           activity_deadline_days?: number
+          approved_payout_methods?: string[]
           default_assisted_rate?: number
           default_closed_rate?: number
           default_months?: number
@@ -2016,6 +2018,7 @@ export type Database = {
         }
         Update: {
           activity_deadline_days?: number
+          approved_payout_methods?: string[]
           default_assisted_rate?: number
           default_closed_rate?: number
           default_months?: number
@@ -2240,11 +2243,16 @@ export type Database = {
       partners: {
         Row: {
           activated_at: string | null
+          country: string | null
           created_at: string
           display_name: string | null
           id: string
           invite_email: string
           invited_by: string | null
+          payout_contact: string | null
+          payout_method: string | null
+          payout_method_approved_at: string | null
+          payout_method_approved_by: string | null
           referral_code: string
           status: string
           updated_at: string
@@ -2252,11 +2260,16 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          country?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
           invite_email: string
           invited_by?: string | null
+          payout_contact?: string | null
+          payout_method?: string | null
+          payout_method_approved_at?: string | null
+          payout_method_approved_by?: string | null
           referral_code: string
           status?: string
           updated_at?: string
@@ -2264,11 +2277,16 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          country?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
           invite_email?: string
           invited_by?: string | null
+          payout_contact?: string | null
+          payout_method?: string | null
+          payout_method_approved_at?: string | null
+          payout_method_approved_by?: string | null
           referral_code?: string
           status?: string
           updated_at?: string
@@ -3015,6 +3033,16 @@ export type Database = {
           p_email: string
         }
         Returns: string
+      }
+      admin_set_partner_payout: {
+        Args: {
+          p_contact: string
+          p_country: string
+          p_method: string
+          p_partner_id: string
+          p_reason?: string
+        }
+        Returns: undefined
       }
       booking_tstzrange: {
         Args: { duration_min: number; start_time: string }
