@@ -41,11 +41,13 @@ export default function PartnerDashboard() {
     queryKey: ["partner-summary", access?.partner_id],
     enabled: active,
     queryFn: async () => {
-      const [prospects, commissions, rates, me] = await Promise.all([
+      const [prospects, commissions, rates, me, report, monthly] = await Promise.all([
         db.from("partner_prospects").select("status"),
         db.from("partner_commissions").select("id, status, amount_cents, currency, source_type, occurred_at, earn_after").order("occurred_at", { ascending: false }),
         db.from("partner_rate_versions").select("commission_type, rate, months, effective_from").order("effective_from", { ascending: false }),
         db.from("partners").select("payout_method, country").eq("id", access!.partner_id).maybeSingle(),
+        db.rpc("partner_report").then(({ data, error }: any) => error ? null : (data as any[])[0] ?? null),
+        db.rpc("partner_report_monthly", { p_partner: null, p_months: 6 }).then(({ data, error }: any) => error ? [] : (data as any[])),
       ]);
       const byStatus: Record<string, number> = {};
       (prospects.data ?? []).forEach((p: any) => (byStatus[p.status] = (byStatus[p.status] ?? 0) + 1));
