@@ -22,7 +22,7 @@ export default function AdminPartners() {
     queryFn: async () => {
       const { data, error } = await db
         .from("partners")
-        .select("id, invite_email, display_name, referral_code, status, created_at, partner_rate_versions(commission_type, rate, months, effective_from)")
+        .select("id, invite_email, display_name, referral_code, status, created_at, country, payout_method, payout_contact, partner_rate_versions(commission_type, rate, months, effective_from)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
