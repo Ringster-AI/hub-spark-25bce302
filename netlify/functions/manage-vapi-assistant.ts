@@ -48,7 +48,7 @@ const getAssistantIdFromAgent = (agent: any): string | null => {
   return null
 };
 
-const CALENDAR_TOOL_VERSION = '2.6'
+const CALENDAR_TOOL_VERSION = '2.7'
 
 type CalendarToolConfig = {
   version: string
@@ -56,6 +56,7 @@ type CalendarToolConfig = {
   check_availability_id?: string | null
   book_appointment_id?: string | null
   get_current_datetime_id?: string | null
+  send_sms_id?: string | null
 }
 
 type BookingFieldDef = {
@@ -380,6 +381,34 @@ try {
   return { error: true, message: 'Could not determine current date/time.' };
 }`
 
+  const sendSmsCode = `
+const { message, to_number = null } = args;
+const { SUPABASE_URL, CALENDAR_SECRET, ASSISTANT_ID } = env;
+
+if (!message || typeof message !== 'string' || !message.trim()) {
+  return { error: true, message: 'No message content was provided.' };
+}
+
+try {
+  const res = await fetch(\`${'${SUPABASE_URL}'}/functions/v1/vapi-sms-tool\`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-vapi-secret': CALENDAR_SECRET,
+    },
+    body: JSON.stringify({
+      assistant_id: ASSISTANT_ID,
+      message: message.trim(),
+      to_number,
+    }),
+  });
+
+  const payload = await res.json().catch(() => ({ error: true, message: 'Messaging service error' }));
+  return payload;
+} catch (e) {
+  return { error: true, message: 'Messaging service temporarily unavailable.' };
+}`
+
   return {
     checkAvailabilityTool: {
       type: 'code',
@@ -445,6 +474,32 @@ try {
       },
       code: getCurrentDatetimeCode,
       environmentVariables: [{ name: 'TIMEZONE_DEFAULT', value: 'America/New_York' }],
+    },
+
+    sendSmsTool: {
+      type: 'code',
+      function: {
+        name: 'send_sms_to_caller',
+        description:
+          'Send a text message (SMS) to the caller during this call. Use it when the caller asks you to text them something — a link, an address, a phone number, a confirmation, or a short summary. ' +
+          'Keep the message under 300 characters and write it as a complete, friendly text. ' +
+          'By default it goes to the number the caller is calling from; only pass to_number if the caller explicitly asks for the text to go to a different number. ' +
+          'Always confirm to the caller out loud after the text is sent.',
+        parameters: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', description: 'The full text message content to send (max 300 characters).' },
+            to_number: { type: 'string', description: 'Optional alternate phone number (E.164) if the caller wants the text sent somewhere other than the number they are calling from.' },
+          },
+          required: ['message'],
+        },
+      },
+      code: sendSmsCode,
+      environmentVariables: [
+        { name: 'SUPABASE_URL', value: supabaseUrl },
+        { name: 'CALENDAR_SECRET', value: calendarSecret },
+        { name: 'ASSISTANT_ID', value: assistantId },
+      ],
     },
   }
 }
@@ -622,14 +677,15 @@ async function ensureAssistantCalendarTools(
       deleteVapiTool(existingToolConfig?.check_availability_id),
       deleteVapiTool(existingToolConfig?.book_appointment_id),
       deleteVapiTool(existingToolConfig?.get_current_datetime_id),
+      deleteVapiTool(existingToolConfig?.send_sms_id),
     ])
   }
 
   const reusableToolConfig = mustRecreate ? undefined : existingToolConfig
-  const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
+  const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool, sendSmsTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
   const toolMetadata = { agent_id: agentId, assistant_id: assistantId }
 
-  const [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId] = await Promise.all([
+  const [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId, sendSmsId] = await Promise.all([
     includeBookingTools
       ? upsertVapiTool(reusableToolConfig?.check_availability_id, checkAvailabilityTool, { ...toolMetadata, tool_kind: 'check_availability' })
       : Promise.resolve(reusableToolConfig?.check_availability_id || null),
@@ -637,16 +693,20 @@ async function ensureAssistantCalendarTools(
       ? upsertVapiTool(reusableToolConfig?.book_appointment_id, bookAppointmentTool, { ...toolMetadata, tool_kind: 'book_appointment' })
       : Promise.resolve(reusableToolConfig?.book_appointment_id || null),
     upsertVapiTool(reusableToolConfig?.get_current_datetime_id, getCurrentDatetimeTool, { ...toolMetadata, tool_kind: 'get_current_datetime' }),
+    // SMS tool is a general capability — attach it whether or not calendar
+    // booking is enabled for this agent.
+    upsertVapiTool(reusableToolConfig?.send_sms_id, sendSmsTool, { ...toolMetadata, tool_kind: 'send_sms_to_caller' }),
   ])
 
   return {
-    toolIds: [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId].filter(Boolean) as string[],
+    toolIds: [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId, sendSmsId].filter(Boolean) as string[],
     calendarToolConfig: {
       version: CALENDAR_TOOL_VERSION,
       signature: currentSignature,
       check_availability_id: checkAvailabilityId,
       book_appointment_id: bookAppointmentId,
       get_current_datetime_id: getCurrentDatetimeId,
+      send_sms_id: sendSmsId,
     },
   }
 }
@@ -733,6 +793,7 @@ export const handler: Handler = async (event) => {
         deleteVapiTool(calendarCfg?.check_availability_id),
         deleteVapiTool(calendarCfg?.book_appointment_id),
         deleteVapiTool(calendarCfg?.get_current_datetime_id),
+        deleteVapiTool(calendarCfg?.send_sms_id),
       ])
       // Sweep anything else still tagged for this agent.
       await reconcileAgentTools(agentId, [])
@@ -1033,6 +1094,7 @@ export const handler: Handler = async (event) => {
         calendarToolConfig.check_availability_id,
         calendarToolConfig.book_appointment_id,
         calendarToolConfig.get_current_datetime_id,
+        calendarToolConfig.send_sms_id,
       ]
 
       // Reconcile: delete any Vapi tools tagged with this agent that are no
