@@ -1393,6 +1393,889 @@ export type Database = {
           },
         ]
       }
+      partner_activities: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          next_action: string | null
+          occurred_at: string
+          partner_id: string
+          prospect_id: string
+          summary: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          next_action?: string | null
+          occurred_at?: string
+          partner_id: string
+          prospect_id: string
+          summary: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          next_action?: string | null
+          occurred_at?: string
+          partner_id?: string
+          prospect_id?: string
+          summary?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_activities_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_activities_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "partner_prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_agreement_acceptances: {
+        Row: {
+          accepted_at: string
+          agreement_id: string
+          id: string
+          ip_address: string | null
+          partner_id: string
+          user_agent: string | null
+          version: string
+        }
+        Insert: {
+          accepted_at?: string
+          agreement_id: string
+          id?: string
+          ip_address?: string | null
+          partner_id: string
+          user_agent?: string | null
+          version: string
+        }
+        Update: {
+          accepted_at?: string
+          agreement_id?: string
+          id?: string
+          ip_address?: string | null
+          partner_id?: string
+          user_agent?: string | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_agreement_acceptances_agreement_id_fkey"
+            columns: ["agreement_id"]
+            isOneToOne: false
+            referencedRelation: "partner_agreements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_agreement_acceptances_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_agreements: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          published_at: string | null
+          title: string
+          version: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          published_at?: string | null
+          title: string
+          version: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          published_at?: string | null
+          title?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      partner_attributions: {
+        Row: {
+          account_id: string
+          agreement_version: string | null
+          approved_at: string | null
+          approved_by: string | null
+          commission_type: string
+          conversion_kind: string
+          created_at: string
+          eligibility_ends_at: string | null
+          eligibility_starts_at: string | null
+          holding_annual_days: number
+          holding_monthly_days: number
+          id: string
+          match_evidence: Json
+          method: string
+          months_snapshot: number
+          partner_id: string
+          prospect_id: string | null
+          rate_snapshot: number
+          rate_version_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          agreement_version?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          commission_type?: string
+          conversion_kind?: string
+          created_at?: string
+          eligibility_ends_at?: string | null
+          eligibility_starts_at?: string | null
+          holding_annual_days: number
+          holding_monthly_days: number
+          id?: string
+          match_evidence?: Json
+          method: string
+          months_snapshot: number
+          partner_id: string
+          prospect_id?: string | null
+          rate_snapshot: number
+          rate_version_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          agreement_version?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          commission_type?: string
+          conversion_kind?: string
+          created_at?: string
+          eligibility_ends_at?: string | null
+          eligibility_starts_at?: string | null
+          holding_annual_days?: number
+          holding_monthly_days?: number
+          id?: string
+          match_evidence?: Json
+          method?: string
+          months_snapshot?: number
+          partner_id?: string
+          prospect_id?: string | null
+          rate_snapshot?: number
+          rate_version_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_attributions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_attributions_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "partner_prospects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_attributions_rate_version_id_fkey"
+            columns: ["rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "partner_rate_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after: Json | null
+          at: string
+          before: Json | null
+          entity: string
+          entity_id: string | null
+          id: number
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after?: Json | null
+          at?: string
+          before?: Json | null
+          entity: string
+          entity_id?: string | null
+          id?: number
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after?: Json | null
+          at?: string
+          before?: Json | null
+          entity?: string
+          entity_id?: string | null
+          id?: number
+          reason?: string | null
+        }
+        Relationships: []
+      }
+      partner_commissions: {
+        Row: {
+          account_id: string
+          amount_cents: number
+          attribution_id: string
+          billing_interval: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          earn_after: string
+          eligible_cents: number
+          excluded_cents: number
+          gross_line_cents: number
+          id: string
+          invoice_id: string | null
+          invoice_line_id: string | null
+          ledger_key: string
+          occurred_at: string
+          partner_id: string
+          payout_id: string | null
+          rate: number
+          rate_version_id: string | null
+          reason: string | null
+          source_type: string
+          status: string
+          stripe_event_id: string | null
+          stripe_object_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          amount_cents: number
+          attribution_id: string
+          billing_interval?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          earn_after: string
+          eligible_cents: number
+          excluded_cents?: number
+          gross_line_cents?: number
+          id?: string
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          ledger_key: string
+          occurred_at: string
+          partner_id: string
+          payout_id?: string | null
+          rate: number
+          rate_version_id?: string | null
+          reason?: string | null
+          source_type: string
+          status?: string
+          stripe_event_id?: string | null
+          stripe_object_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          amount_cents?: number
+          attribution_id?: string
+          billing_interval?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          earn_after?: string
+          eligible_cents?: number
+          excluded_cents?: number
+          gross_line_cents?: number
+          id?: string
+          invoice_id?: string | null
+          invoice_line_id?: string | null
+          ledger_key?: string
+          occurred_at?: string
+          partner_id?: string
+          payout_id?: string | null
+          rate?: number
+          rate_version_id?: string | null
+          reason?: string | null
+          source_type?: string
+          status?: string
+          stripe_event_id?: string | null
+          stripe_object_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_commissions_attribution_id_fkey"
+            columns: ["attribution_id"]
+            isOneToOne: false
+            referencedRelation: "partner_attributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_commissions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_commissions_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "partner_payouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_commissions_rate_version_id_fkey"
+            columns: ["rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "partner_rate_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_demo_settings: {
+        Row: {
+          buffer_min: number
+          calendar_id: string
+          duration_min: number
+          google_integration_id: string | null
+          id: boolean
+          min_notice_hours: number
+          timezone: string
+          updated_at: string
+          window_days: number
+          working_days: number[]
+          working_end: string
+          working_start: string
+        }
+        Insert: {
+          buffer_min?: number
+          calendar_id?: string
+          duration_min?: number
+          google_integration_id?: string | null
+          id?: boolean
+          min_notice_hours?: number
+          timezone?: string
+          updated_at?: string
+          window_days?: number
+          working_days?: number[]
+          working_end?: string
+          working_start?: string
+        }
+        Update: {
+          buffer_min?: number
+          calendar_id?: string
+          duration_min?: number
+          google_integration_id?: string | null
+          id?: boolean
+          min_notice_hours?: number
+          timezone?: string
+          updated_at?: string
+          window_days?: number
+          working_days?: number[]
+          working_end?: string
+          working_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_demo_settings_google_integration_id_fkey"
+            columns: ["google_integration_id"]
+            isOneToOne: false
+            referencedRelation: "google_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_demos: {
+        Row: {
+          calendar_id: string
+          created_at: string
+          google_event_id: string | null
+          hold_expires_at: string | null
+          id: string
+          partner_id: string
+          prospect_id: string
+          slot: unknown
+          slot_end: string
+          slot_start: string
+          status: string
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          calendar_id: string
+          created_at?: string
+          google_event_id?: string | null
+          hold_expires_at?: string | null
+          id?: string
+          partner_id: string
+          prospect_id: string
+          slot?: unknown
+          slot_end: string
+          slot_start: string
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          calendar_id?: string
+          created_at?: string
+          google_event_id?: string | null
+          hold_expires_at?: string | null
+          id?: string
+          partner_id?: string
+          prospect_id?: string
+          slot?: unknown
+          slot_end?: string
+          slot_start?: string
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_demos_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_demos_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "partner_prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_materials: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_path: string | null
+          id: string
+          is_published: boolean
+          kind: string
+          sort: number
+          title: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_path?: string | null
+          id?: string
+          is_published?: boolean
+          kind: string
+          sort?: number
+          title: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_path?: string | null
+          id?: string
+          is_published?: boolean
+          kind?: string
+          sort?: number
+          title?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      partner_payouts: {
+        Row: {
+          approved_by: string | null
+          carried_forward_cents: number
+          created_at: string
+          currency: string
+          id: string
+          method: string | null
+          paid_at: string | null
+          partner_id: string
+          period: string
+          recorded_by: string | null
+          reference: string | null
+          scheduled_for: string
+          status: string
+          total_cents: number
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          carried_forward_cents?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          method?: string | null
+          paid_at?: string | null
+          partner_id: string
+          period: string
+          recorded_by?: string | null
+          reference?: string | null
+          scheduled_for: string
+          status?: string
+          total_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          carried_forward_cents?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          method?: string | null
+          paid_at?: string | null
+          partner_id?: string
+          period?: string
+          recorded_by?: string | null
+          reference?: string | null
+          scheduled_for?: string
+          status?: string
+          total_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_payouts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_program_config: {
+        Row: {
+          activity_deadline_days: number
+          default_assisted_rate: number
+          default_closed_rate: number
+          default_months: number
+          excluded_line_kinds: string[]
+          excluded_price_ids: string[]
+          holding_annual_days: number
+          holding_monthly_days: number
+          id: boolean
+          link_touch_days: number
+          min_payout_cents: number
+          payout_day: number
+          protection_days: number
+          updated_at: string
+          volume_flag: Json
+        }
+        Insert: {
+          activity_deadline_days?: number
+          default_assisted_rate?: number
+          default_closed_rate?: number
+          default_months?: number
+          excluded_line_kinds?: string[]
+          excluded_price_ids?: string[]
+          holding_annual_days?: number
+          holding_monthly_days?: number
+          id?: boolean
+          link_touch_days?: number
+          min_payout_cents?: number
+          payout_day?: number
+          protection_days?: number
+          updated_at?: string
+          volume_flag?: Json
+        }
+        Update: {
+          activity_deadline_days?: number
+          default_assisted_rate?: number
+          default_closed_rate?: number
+          default_months?: number
+          excluded_line_kinds?: string[]
+          excluded_price_ids?: string[]
+          holding_annual_days?: number
+          holding_monthly_days?: number
+          id?: boolean
+          link_touch_days?: number
+          min_payout_cents?: number
+          payout_day?: number
+          protection_days?: number
+          updated_at?: string
+          volume_flag?: Json
+        }
+        Relationships: []
+      }
+      partner_prospects: {
+        Row: {
+          activity_deadline: string
+          business_name: string
+          city: string | null
+          contact_name: string | null
+          converted_account_id: string | null
+          created_at: string
+          email: string | null
+          id: string
+          industry: string | null
+          industry_other: string | null
+          last_contact_at: string | null
+          lead_source: string | null
+          location_label: string | null
+          match_key_business: string | null
+          next_follow_up_at: string | null
+          norm_business: string | null
+          norm_domain: string | null
+          norm_email: string | null
+          norm_phone: string | null
+          notes: string | null
+          partner_id: string
+          phone: string | null
+          postal_code: string | null
+          protected_until: string
+          protection_status: string
+          purchasing_entity: string
+          status: string
+          street: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          activity_deadline?: string
+          business_name: string
+          city?: string | null
+          contact_name?: string | null
+          converted_account_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          industry_other?: string | null
+          last_contact_at?: string | null
+          lead_source?: string | null
+          location_label?: string | null
+          match_key_business?: string | null
+          next_follow_up_at?: string | null
+          norm_business?: string | null
+          norm_domain?: string | null
+          norm_email?: string | null
+          norm_phone?: string | null
+          notes?: string | null
+          partner_id: string
+          phone?: string | null
+          postal_code?: string | null
+          protected_until?: string
+          protection_status?: string
+          purchasing_entity?: string
+          status?: string
+          street?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          activity_deadline?: string
+          business_name?: string
+          city?: string | null
+          contact_name?: string | null
+          converted_account_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          industry_other?: string | null
+          last_contact_at?: string | null
+          lead_source?: string | null
+          location_label?: string | null
+          match_key_business?: string | null
+          next_follow_up_at?: string | null
+          norm_business?: string | null
+          norm_domain?: string | null
+          norm_email?: string | null
+          norm_phone?: string | null
+          notes?: string | null
+          partner_id?: string
+          phone?: string | null
+          postal_code?: string | null
+          protected_until?: string
+          protection_status?: string
+          purchasing_entity?: string
+          status?: string
+          street?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_prospects_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_rate_versions: {
+        Row: {
+          commission_type: string
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          holding_annual_days: number
+          holding_monthly_days: number
+          id: string
+          months: number
+          partner_id: string
+          rate: number
+          reason: string | null
+        }
+        Insert: {
+          commission_type: string
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          holding_annual_days?: number
+          holding_monthly_days?: number
+          id?: string
+          months?: number
+          partner_id: string
+          rate: number
+          reason?: string | null
+        }
+        Update: {
+          commission_type?: string
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          holding_annual_days?: number
+          holding_monthly_days?: number
+          id?: string
+          months?: number
+          partner_id?: string
+          rate?: number
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_rate_versions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_review_flags: {
+        Row: {
+          created_at: string
+          details: Json
+          id: string
+          kind: string
+          partner_id: string
+          resolution: string | null
+          resolved_by: string | null
+          status: string
+          subject_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          id?: string
+          kind: string
+          partner_id: string
+          resolution?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          id?: string
+          kind?: string
+          partner_id?: string
+          resolution?: string | null
+          resolved_by?: string | null
+          status?: string
+          subject_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_review_flags_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partners: {
+        Row: {
+          activated_at: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          invite_email: string
+          invited_by: string | null
+          referral_code: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          invite_email: string
+          invited_by?: string | null
+          referral_code: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          invite_email?: string
+          invited_by?: string | null
+          referral_code?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       phone_verifications: {
         Row: {
           attempts: number | null
@@ -1593,6 +2476,77 @@ export type Database = {
           identifier?: string
           updated_at?: string | null
           window_start?: string | null
+        }
+        Relationships: []
+      }
+      referral_touches: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          landing_url: string | null
+          partner_id: string
+          source: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          landing_url?: string | null
+          partner_id: string
+          source: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          landing_url?: string | null
+          partner_id?: string
+          source?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_touches_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stripe_webhook_events: {
+        Row: {
+          error: string | null
+          processed_at: string | null
+          received_at: string
+          status: string
+          stripe_event_id: string
+          type: string
+        }
+        Insert: {
+          error?: string | null
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+          stripe_event_id: string
+          type: string
+        }
+        Update: {
+          error?: string | null
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+          stripe_event_id?: string
+          type?: string
         }
         Relationships: []
       }
@@ -2040,6 +2994,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_partner_agreement: {
+        Args: { p_agreement_id: string; p_user_agent?: string }
+        Returns: string
+      }
       add_credits: {
         Args: {
           p_credit_type?: string
@@ -2048,6 +3006,15 @@ export type Database = {
           p_user_id: string
         }
         Returns: boolean
+      }
+      admin_invite_partner: {
+        Args: {
+          p_assisted_rate?: number
+          p_closed_rate?: number
+          p_display_name: string
+          p_email: string
+        }
+        Returns: string
       }
       booking_tstzrange: {
         Args: { duration_min: number; start_time: string }
@@ -2058,6 +3025,7 @@ export type Database = {
         Args: { p_code: string; p_phone_number: string; p_ttl_minutes?: number }
         Returns: string
       }
+      current_partner_id: { Args: never; Returns: string }
       deduct_credits: {
         Args: {
           p_call_log_id?: string
@@ -2112,8 +3080,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { user_id: string }; Returns: boolean }
+      is_partner_admin: { Args: { _uid: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       migrate_google_integrations: { Args: never; Returns: undefined }
+      my_partner_access: { Args: never; Returns: Json }
       process_campaign_contacts: { Args: never; Returns: undefined }
       reset_monthly_credits: { Args: { p_user_id: string }; Returns: boolean }
       sync_user_subscription: {
@@ -2137,7 +3107,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user" | "super_admin"
+      app_role: "admin" | "user" | "super_admin" | "partner"
       team_member_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
@@ -2266,7 +3236,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user", "super_admin"],
+      app_role: ["admin", "user", "super_admin", "partner"],
       team_member_role: ["owner", "admin", "member"],
     },
   },
