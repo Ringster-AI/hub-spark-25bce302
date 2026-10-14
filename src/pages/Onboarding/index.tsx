@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useOnboardingProgress, TOTAL_STEPS } from "@/hooks/useOnboardingProgress";
 import { StepRail, OnboardingStep } from "@/components/onboarding/StepRail";
 import { Seo } from "@/components/seo/Seo";
@@ -113,6 +113,11 @@ const Onboarding = () => {
 
         {/* Right content */}
         <main className="pb-16">
+          {import.meta.env.VITE_RINGSTER_DEMO_ENABLED === 'true' && <div className="mb-8 rounded-xl border border-indigo-400/30 bg-indigo-500/10 p-5">
+            <h2 className="text-lg font-semibold">Hear your receptionist first</h2>
+            <p className="my-2 text-sm text-white/70">Try a personalised two-minute role-play before setting up your phone or calendar.</p>
+            <Link to="/demo" className="text-indigo-200 underline">Try my receptionist →</Link>
+          </div>}
           {step === 1 && <MeetAgentStep onNext={goNext} initial={progress?.choices} />}
           {step === 2 && <VoiceStep onNext={goNext} onBack={goBack} initial={progress?.choices} />}
           {step === 3 && <PhoneStep onNext={goNext} onBack={goBack} initial={progress?.choices} />}

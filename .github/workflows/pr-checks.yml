@@ -22,7 +22,7 @@ jobs:
       - name: Unit and demo database tests
         run: npm test
       - name: Lint demo foundation
-        run: npx --no-install eslint netlify/functions/services/demo netlify/functions/demo-session.ts netlify/functions/demo-webhook.ts tests/demo vitest.config.ts
+        run: npx --no-install eslint netlify/functions/services/demo netlify/functions/demo-session.ts netlify/functions/demo-webhook.ts src/features/demo src/pages/Demo.tsx tests/demo vitest.config.ts
       - name: Typecheck demo foundation
         run: npx --no-install tsc -p tsconfig.demo.json
       - name: Production build (no production configuration)

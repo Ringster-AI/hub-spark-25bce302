@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import Index from "./pages/Index";
 import AIReceptionist from "./pages/AIReceptionist";
 import HowItWorks from "./pages/HowItWorks";
@@ -41,6 +41,7 @@ import OAuthConsent from "./pages/OAuthConsent";
 import ProgrammaticLanding from "./pages/ProgrammaticLanding";
 
 const queryClient = new QueryClient();
+const Demo = lazy(() => import('./pages/Demo'));
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -171,6 +172,9 @@ function App() {
                 <Onboarding />
               </PrivateRoute>
             } />
+            {import.meta.env.VITE_RINGSTER_DEMO_ENABLED === 'true' && <Route path="/demo" element={
+              <PrivateRoute><Suspense fallback={<p role="status">Loading your demo…</p>}><Demo /></Suspense></PrivateRoute>
+            } />}
             <Route path="/dashboard/*" element={
               <PrivateRoute>
                 <Dashboard />
