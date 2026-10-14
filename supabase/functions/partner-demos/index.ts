@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const { data: partner } = await db.from("partners").select("id,status,display_name,invite_email")
     .eq("user_id", user.id).maybeSingle();
-  const { data: isAdmin } = await db.rpc("is_partner_admin", { _user_id: user.id }).then(
+  const { data: isAdmin } = await db.rpc("is_partner_admin", { _uid: user.id }).then(
     (r: any) => r, () => ({ data: false }));
 
   try {
