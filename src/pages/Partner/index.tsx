@@ -41,11 +41,13 @@ export default function PartnerDashboard() {
     queryKey: ["partner-summary", access?.partner_id],
     enabled: active,
     queryFn: async () => {
-      const [prospects, commissions, rates, me] = await Promise.all([
+      const [prospects, commissions, rates, me, report, monthly] = await Promise.all([
         db.from("partner_prospects").select("status"),
         db.from("partner_commissions").select("id, status, amount_cents, currency, source_type, occurred_at, earn_after").order("occurred_at", { ascending: false }),
         db.from("partner_rate_versions").select("commission_type, rate, months, effective_from").order("effective_from", { ascending: false }),
         db.from("partners").select("payout_method, country").eq("id", access!.partner_id).maybeSingle(),
+        db.rpc("partner_report").then(({ data, error }: any) => error ? null : (data as any[])[0] ?? null),
+        db.rpc("partner_report_monthly", { p_partner: null, p_months: 6 }).then(({ data, error }: any) => error ? [] : (data as any[])),
       ]);
       const byStatus: Record<string, number> = {};
       (prospects.data ?? []).forEach((p: any) => (byStatus[p.status] = (byStatus[p.status] ?? 0) + 1));
@@ -57,7 +59,7 @@ export default function PartnerDashboard() {
       });
       const latest: Record<string, any> = {};
       (rates.data ?? []).forEach((r: any) => (latest[r.commission_type] ??= r));
-      return { byStatus, totals, rates: latest, payout: me.data, history: (commissions.data ?? []).slice(0, 50) };
+      return { byStatus, totals, rates: latest, payout: me.data, history: (commissions.data ?? []).slice(0, 50), report, monthly };
     },
   });
 
@@ -170,6 +172,39 @@ export default function PartnerDashboard() {
             <p>Payout method: {summary?.payout?.payout_method ? ({ interac_etransfer: "Interac e-transfer", wise: "Wise", paypal: "PayPal", wire: "Wire transfer" } as Record<string, string>)[summary.payout.payout_method] ?? summary.payout.payout_method : "Not set yet. Ringster will contact you."}</p>
             <p>Payouts are made on the 15th of each month for approved commission (minimum $50; smaller balances roll forward). Holding period: 30 days for monthly plans, 45 days for annual plans.</p>
             <p className="text-muted-foreground">Ringster sets the commission type from your documented sales activity. Demo booking and sales materials are coming next.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Your performance</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                ["Paying customers", summary?.report?.credited_customers ?? 0],
+                ["Still subscribed", summary?.report?.active_customers ?? 0],
+                ["Retention", `${(((summary?.report?.retention_rate) ?? 0) * 100).toFixed(0)}%`],
+                ["Revenue collected", fmt(summary?.report?.collected_revenue_cents ?? 0)],
+                ["Commission vs revenue", `${(((summary?.report?.commission_ratio) ?? 0) * 100).toFixed(0)}%`],
+              ].map(([l, v]) => (
+                <div key={l as string}><div className="text-xl font-semibold">{v}</div><div className="text-sm text-muted-foreground">{l}</div></div>
+              ))}
+            </div>
+            {(summary?.monthly ?? []).some((m: any) => m.collected_revenue_cents !== 0 || m.new_customers > 0) && (
+              <div>
+                <h3 className="text-sm font-medium mb-1">Last 6 months</h3>
+                <div className="space-y-1 text-sm">
+                  {summary!.monthly.map((m: any) => (
+                    (m.collected_revenue_cents !== 0 || m.new_customers > 0) ? (
+                      <div key={m.month} className="flex justify-between border-b py-1">
+                        <span>{new Date(`${m.month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>
+                        <span className="text-muted-foreground">
+                          {m.new_customers} new customer{m.new_customers === 1 ? "" : "s"} · {fmt(m.collected_revenue_cents)} collected · {fmt(m.commission_cents)} commission
+                        </span>
+                      </div>
+                    ) : null
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
         <PartnerProspects />
