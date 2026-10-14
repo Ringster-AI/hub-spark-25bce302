@@ -103,3 +103,6 @@ project_id = "owzerqaududhfwngyqbp"
 [functions.partner-demos]
   verify_jwt = false
   allow_public_network_access = true
+
+[functions.send-partner-invite]
+verify_jwt = false
