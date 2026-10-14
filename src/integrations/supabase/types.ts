@@ -3110,6 +3110,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_set_demo_outcome: {
+        Args: { p_demo: string; p_status: string }
+        Returns: undefined
+      }
       admin_set_partner_payout: {
         Args: {
           p_contact: string
