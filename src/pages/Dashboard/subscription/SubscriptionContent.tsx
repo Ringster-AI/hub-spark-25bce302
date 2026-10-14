@@ -9,6 +9,7 @@ import { PricingPlans } from "@/components/subscription/PricingPlans";
 import { CreditDisplay } from "@/components/credits/CreditDisplay";
 import { CreditTransactionHistory } from "@/components/credits/CreditTransactionHistory";
 import { supabase } from "@/integrations/supabase/client";
+import { ReferralCodeInput } from "@/components/partner/ReferralTracker";
 import { useToast } from "@/hooks/use-toast";
 
 export const SubscriptionContent = () => {
@@ -62,6 +63,7 @@ export const SubscriptionContent = () => {
     <div className="w-full">
       <div className="p-4 md:p-6">
         <SubscriptionHeader />
+        <ReferralCodeInput />
 
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 mb-6 text-sm text-foreground">
           <span className="font-medium">How credits work:</span>{" "}
