@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     if (!RESEND_API_KEY) return json({ error: "Email sending is not configured (RESEND_API_KEY missing)" }, 500);
 
     const email = String(p.invite_email).toLowerCase();
-    const link = `${APP_URL}/auth?redirect=${encodeURIComponent("/partner")}&email=${encodeURIComponent(email)}`;
+    const link = `${APP_URL}/login?next=${encodeURIComponent("/partner")}`;
     const name = p.display_name ? esc(p.display_name) : "there";
 
     const r = await fetch("https://api.resend.com/emails", {
