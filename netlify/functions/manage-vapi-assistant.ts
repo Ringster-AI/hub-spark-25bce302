@@ -381,6 +381,34 @@ try {
   return { error: true, message: 'Could not determine current date/time.' };
 }`
 
+  const sendSmsCode = `
+const { message, to_number = null } = args;
+const { SUPABASE_URL, CALENDAR_SECRET, ASSISTANT_ID } = env;
+
+if (!message || typeof message !== 'string' || !message.trim()) {
+  return { error: true, message: 'No message content was provided.' };
+}
+
+try {
+  const res = await fetch(\`${'${SUPABASE_URL}'}/functions/v1/vapi-sms-tool\`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-vapi-secret': CALENDAR_SECRET,
+    },
+    body: JSON.stringify({
+      assistant_id: ASSISTANT_ID,
+      message: message.trim(),
+      to_number,
+    }),
+  });
+
+  const payload = await res.json().catch(() => ({ error: true, message: 'Messaging service error' }));
+  return payload;
+} catch (e) {
+  return { error: true, message: 'Messaging service temporarily unavailable.' };
+}`
+
   return {
     checkAvailabilityTool: {
       type: 'code',
