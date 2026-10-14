@@ -99,3 +99,7 @@ project_id = "owzerqaududhfwngyqbp"
 
   [functions.analyze-call-compliance]
     allow_public_network_access = true
+
+[functions.partner-demos]
+  verify_jwt = false
+  allow_public_network_access = true
