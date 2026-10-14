@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import AdminPartnerProspects from "./AdminPartnerProspects";
 import AdminPartnerAttributions from "./AdminPartnerAttributions";
+import AdminPartnerPayouts from "./AdminPartnerPayouts";
 
 const db = supabase as any;
 
@@ -96,6 +97,7 @@ export default function AdminPartners() {
           </Table>
         </CardContent>
       </Card>
+      <AdminPartnerPayouts partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
       <AdminPartnerAttributions partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
       <AdminPartnerProspects partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
     </div>
