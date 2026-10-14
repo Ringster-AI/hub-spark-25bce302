@@ -677,14 +677,15 @@ async function ensureAssistantCalendarTools(
       deleteVapiTool(existingToolConfig?.check_availability_id),
       deleteVapiTool(existingToolConfig?.book_appointment_id),
       deleteVapiTool(existingToolConfig?.get_current_datetime_id),
+      deleteVapiTool(existingToolConfig?.send_sms_id),
     ])
   }
 
   const reusableToolConfig = mustRecreate ? undefined : existingToolConfig
-  const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
+  const { checkAvailabilityTool, bookAppointmentTool, getCurrentDatetimeTool, sendSmsTool } = buildAssistantCalendarTools(supabaseUrl, calendarSecret, assistantId, currentConfig)
   const toolMetadata = { agent_id: agentId, assistant_id: assistantId }
 
-  const [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId] = await Promise.all([
+  const [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId, sendSmsId] = await Promise.all([
     includeBookingTools
       ? upsertVapiTool(reusableToolConfig?.check_availability_id, checkAvailabilityTool, { ...toolMetadata, tool_kind: 'check_availability' })
       : Promise.resolve(reusableToolConfig?.check_availability_id || null),
@@ -692,16 +693,20 @@ async function ensureAssistantCalendarTools(
       ? upsertVapiTool(reusableToolConfig?.book_appointment_id, bookAppointmentTool, { ...toolMetadata, tool_kind: 'book_appointment' })
       : Promise.resolve(reusableToolConfig?.book_appointment_id || null),
     upsertVapiTool(reusableToolConfig?.get_current_datetime_id, getCurrentDatetimeTool, { ...toolMetadata, tool_kind: 'get_current_datetime' }),
+    // SMS tool is a general capability — attach it whether or not calendar
+    // booking is enabled for this agent.
+    upsertVapiTool(reusableToolConfig?.send_sms_id, sendSmsTool, { ...toolMetadata, tool_kind: 'send_sms_to_caller' }),
   ])
 
   return {
-    toolIds: [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId].filter(Boolean) as string[],
+    toolIds: [checkAvailabilityId, bookAppointmentId, getCurrentDatetimeId, sendSmsId].filter(Boolean) as string[],
     calendarToolConfig: {
       version: CALENDAR_TOOL_VERSION,
       signature: currentSignature,
       check_availability_id: checkAvailabilityId,
       book_appointment_id: bookAppointmentId,
       get_current_datetime_id: getCurrentDatetimeId,
+      send_sms_id: sendSmsId,
     },
   }
 }
