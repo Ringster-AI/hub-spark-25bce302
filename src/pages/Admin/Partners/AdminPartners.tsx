@@ -36,10 +36,15 @@ export default function AdminPartners() {
   const invite = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const { error } = await db.rpc("admin_invite_partner", { p_email: email.trim(), p_display_name: name.trim() || null });
+    const { data: partnerId, error } = await db.rpc("admin_invite_partner", { p_email: email.trim(), p_display_name: name.trim() || null });
+    if (error) { setBusy(false); return toast.error(error.message); }
+    const id = typeof partnerId === "string" ? partnerId : (partnerId as any)?.id;
+    if (id) {
+      const { error: mailErr } = await supabase.functions.invoke("send-partner-invite", { body: { partner_id: id } });
+      if (mailErr) toast.warning("Partner created, but the invite email failed. Use Resend email to retry.");
+      else toast.success("Partner invited — an email is on its way.");
+    } else toast.success("Partner invited.");
     setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success("Partner invited. Ask them to sign in (or sign up with this email) and open /partner.");
     setEmail(""); setName("");
     qc.invalidateQueries({ queryKey: ["admin-partners"] });
   };
@@ -87,6 +92,10 @@ export default function AdminPartners() {
                   <TableCell>{rateOf(p, "closed")}</TableCell>
                   <TableCell><Badge variant={p.status === "active" ? "default" : "secondary"}>{p.status}</Badge></TableCell>
                   <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={async () => {
+                      const { error } = await supabase.functions.invoke("send-partner-invite", { body: { partner_id: p.id } });
+                      error ? toast.error("Invite email failed to send.") : toast.success(`Invite email sent to ${p.invite_email}`);
+                    }}>Resend email</Button>
                     {p.status !== "suspended"
                       ? <Button size="sm" variant="ghost" onClick={() => setStatus(p.id, "suspended")}>Suspend</Button>
                       : <Button size="sm" variant="ghost" onClick={() => setStatus(p.id, "active")}>Reactivate</Button>}
