@@ -5,4 +5,4 @@
 - [x] Stage 3 Attribution: resolver, precedence, first-paid claim, relationship checks
 - [x] Stage 4 Commissions: webhook dedupe, ledger, refunds/disputes, payouts
 - [x] Stage 5 Demo scheduler: holds, overlap constraint, Google events
-- [ ] Stage 6 Dashboards & reporting, pilot
+- [x] Stage 6 Dashboards & reporting (partner_report + partner_report_monthly, admin Reporting panel, partner performance card) — pilot with one real partner still open
