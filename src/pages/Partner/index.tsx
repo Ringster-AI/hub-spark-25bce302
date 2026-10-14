@@ -174,6 +174,39 @@ export default function PartnerDashboard() {
             <p className="text-muted-foreground">Ringster sets the commission type from your documented sales activity. Demo booking and sales materials are coming next.</p>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Your performance</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                ["Paying customers", summary?.report?.credited_customers ?? 0],
+                ["Still subscribed", summary?.report?.active_customers ?? 0],
+                ["Retention", `${(((summary?.report?.retention_rate) ?? 0) * 100).toFixed(0)}%`],
+                ["Revenue collected", fmt(summary?.report?.collected_revenue_cents ?? 0)],
+                ["Commission vs revenue", `${(((summary?.report?.commission_ratio) ?? 0) * 100).toFixed(0)}%`],
+              ].map(([l, v]) => (
+                <div key={l as string}><div className="text-xl font-semibold">{v}</div><div className="text-sm text-muted-foreground">{l}</div></div>
+              ))}
+            </div>
+            {(summary?.monthly ?? []).some((m: any) => m.collected_revenue_cents !== 0 || m.new_customers > 0) && (
+              <div>
+                <h3 className="text-sm font-medium mb-1">Last 6 months</h3>
+                <div className="space-y-1 text-sm">
+                  {summary!.monthly.map((m: any) => (
+                    (m.collected_revenue_cents !== 0 || m.new_customers > 0) ? (
+                      <div key={m.month} className="flex justify-between border-b py-1">
+                        <span>{new Date(`${m.month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>
+                        <span className="text-muted-foreground">
+                          {m.new_customers} new customer{m.new_customers === 1 ? "" : "s"} · {fmt(m.collected_revenue_cents)} collected · {fmt(m.commission_cents)} commission
+                        </span>
+                      </div>
+                    ) : null
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
         <PartnerProspects />
         <Card>
           <CardHeader><CardTitle className="text-base">Commission history</CardTitle></CardHeader>
