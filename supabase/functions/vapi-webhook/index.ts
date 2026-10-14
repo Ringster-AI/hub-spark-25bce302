@@ -337,6 +337,51 @@ Deno.serve(async (req) => {
       console.error("post-call email enqueue failed", emailErr);
     }
 
+    // Instant owner SMS alerts for urgent calls / hot leads -----------------
+    try {
+      const analysis = message?.analysis ?? {};
+      const summary: string = String(analysis.summary ?? message?.summary ?? "").trim();
+      const transcriptText: string = typeof transcriptUrl === "string" ? transcriptUrl : "";
+      const haystack = `${summary}\n${transcriptText}`.toLowerCase();
+      const URGENT = ["urgent", "emergency", "asap", "right away", "immediately", "speak to a manager", "talk to the owner", "call me back", "callback", "call back", "complaint", "leaking", "flood", "no heat", "broken"];
+      const LEAD = ["quote", "estimate", "pricing", "how much", "interested in", "sign up", "new customer", "book a", "schedule"];
+      const urgentHit = URGENT.find((k) => haystack.includes(k));
+      const leadHit = !urgentHit ? LEAD.find((k) => haystack.includes(k)) : undefined;
+
+      if ((urgentHit || leadHit) && durationSeconds >= 10) {
+        const { data: ownerP } = await admin
+          .from("profiles")
+          .select("phone_number")
+          .eq("id", userId)
+          .maybeSingle();
+        const ownerPhone = ownerP?.phone_number as string | undefined;
+        // Idempotency: one alert per call
+        const { count } = await admin
+          .from("tool_call_logs")
+          .select("id", { count: "exact", head: true })
+          .eq("agent_id", agentId)
+          .eq("tool_name", "owner_sms_alert")
+          .contains("parameters", { vapi_call_id: vapiCallId });
+        if (ownerPhone && (count ?? 0) === 0) {
+          const label = urgentHit ? "URGENT call" : "New lead";
+          const short = (summary || "No summary available.").slice(0, 220);
+          const body = `Ringster ${label} from ${fromNumber ?? "unknown number"}: ${short} https://ringster.ai/dashboard/recordings/${callLogId}`;
+          const { sendTwilioSms } = await import("../_shared/booking-notifications.ts");
+          await sendTwilioSms(ownerPhone, body);
+          await admin.from("tool_call_logs").insert({
+            agent_id: agentId,
+            tool_name: "owner_sms_alert",
+            parameters: { vapi_call_id: vapiCallId, kind: urgentHit ? "urgent" : "lead", trigger: urgentHit ?? leadHit },
+            result: { to: ownerPhone },
+            status: "success",
+          });
+        }
+      }
+    } catch (smsErr) {
+      console.error("owner SMS alert failed", smsErr);
+    }
+
+
     return ok({ call_log_id: callLogId, minutes_charged: Math.max(1, Math.ceil(durationSeconds / 60)) });
 
   } catch (err: any) {
