@@ -475,6 +475,32 @@ try {
       code: getCurrentDatetimeCode,
       environmentVariables: [{ name: 'TIMEZONE_DEFAULT', value: 'America/New_York' }],
     },
+
+    sendSmsTool: {
+      type: 'code',
+      function: {
+        name: 'send_sms_to_caller',
+        description:
+          'Send a text message (SMS) to the caller during this call. Use it when the caller asks you to text them something — a link, an address, a phone number, a confirmation, or a short summary. ' +
+          'Keep the message under 300 characters and write it as a complete, friendly text. ' +
+          'By default it goes to the number the caller is calling from; only pass to_number if the caller explicitly asks for the text to go to a different number. ' +
+          'Always confirm to the caller out loud after the text is sent.',
+        parameters: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', description: 'The full text message content to send (max 300 characters).' },
+            to_number: { type: 'string', description: 'Optional alternate phone number (E.164) if the caller wants the text sent somewhere other than the number they are calling from.' },
+          },
+          required: ['message'],
+        },
+      },
+      code: sendSmsCode,
+      environmentVariables: [
+        { name: 'SUPABASE_URL', value: supabaseUrl },
+        { name: 'CALENDAR_SECRET', value: calendarSecret },
+        { name: 'ASSISTANT_ID', value: assistantId },
+      ],
+    },
   }
 }
 
