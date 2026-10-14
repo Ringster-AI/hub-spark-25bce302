@@ -57,6 +57,44 @@ serve(async (req) => {
       }
     }
 
+    // Billable account = owner user id. Resolve from Stripe metadata, stored customer id, then email.
+    async function resolveAccount(customerId: string, subscriptionId?: string): Promise<string | null> {
+      if (subscriptionId) {
+        try {
+          const sub = await stripe.subscriptions.retrieve(subscriptionId);
+          const uid = (sub.metadata as any)?.supabaseUid;
+          if (uid) return uid;
+        } catch (_) { /* ignore */ }
+      }
+      const customer: any = await stripe.customers.retrieve(customerId);
+      if (customer?.metadata?.supabaseUid) return customer.metadata.supabaseUid;
+      const { data: bySub } = await supabase.from('user_subscriptions').select('user_id').eq('stripe_customer_id', customerId).maybeSingle();
+      if (bySub?.user_id) return bySub.user_id;
+      if (customer?.email) {
+        const { data: p } = await supabase.from('profiles').select('id').eq('email', customer.email).maybeSingle();
+        if (p?.id) {
+          await supabase.from('user_subscriptions').update({ stripe_customer_id: customerId }).eq('user_id', p.id).is('stripe_customer_id', null);
+          return p.id;
+        }
+      }
+      return null;
+    }
+
+    async function claimPartnerAttribution(invoice: any) {
+      const customerId = invoice.customer as string;
+      const uid = await resolveAccount(customerId, invoice.subscription as string);
+      if (!uid) return;
+      const { data: owner } = await supabase.rpc('partner_account_owner', { p_user: uid });
+      const paid = await stripe.invoices.list({ customer: customerId, status: 'paid', limit: 10 });
+      const priorPaid = paid.data.some((i: any) => i.id !== invoice.id && (i.amount_paid ?? 0) > 0 && i.created < invoice.created);
+      const paidAt = new Date(((invoice.status_transitions?.paid_at) ?? invoice.created) * 1000).toISOString();
+      const { data, error } = await supabase.rpc('claim_partner_attribution', {
+        p_account: owner ?? uid, p_stripe_customer: customerId, p_paid_at: paidAt, p_prior_paid: priorPaid,
+      });
+      if (error) throw error;
+      console.log('partner attribution', JSON.stringify(data));
+    }
+
     switch (event.type) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
@@ -139,6 +177,14 @@ serve(async (req) => {
 
       case 'invoice.payment_succeeded': {
         const invoice: any = event.data.object;
+        // Partner attribution: claimed on the first eligible paid subscription invoice
+        if (invoice.subscription && (invoice.amount_paid ?? 0) > 0) {
+          try {
+            await claimPartnerAttribution(invoice);
+          } catch (e) {
+            console.error('partner attribution failed', e);
+          }
+        }
         if (invoice.billing_reason !== 'subscription_cycle') break;
         const customerId = invoice.customer as string;
         const customer = await stripe.customers.retrieve(customerId);

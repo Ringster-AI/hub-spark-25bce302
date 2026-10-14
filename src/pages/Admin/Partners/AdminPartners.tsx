@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import AdminPartnerProspects from "./AdminPartnerProspects";
+import AdminPartnerAttributions from "./AdminPartnerAttributions";
 
 const db = supabase as any;
 
@@ -95,6 +96,7 @@ export default function AdminPartners() {
           </Table>
         </CardContent>
       </Card>
+      <AdminPartnerAttributions partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
       <AdminPartnerProspects partners={partners.map((p: any) => ({ id: p.id, display_name: p.display_name, email: p.invite_email }))} />
     </div>
   );

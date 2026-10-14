@@ -41,6 +41,7 @@ import OAuthConsent from "./pages/OAuthConsent";
 import ProgrammaticLanding from "./pages/ProgrammaticLanding";
 import PartnerDashboard from "./pages/Partner";
 import AdminPartners from "./pages/Admin/Partners/AdminPartners";
+import { ReferralTracker } from "./components/partner/ReferralTracker";
 
 const queryClient = new QueryClient();
 const Demo = lazy(() => import('./pages/Demo'));
@@ -112,6 +113,7 @@ function App() {
         <Sonner />
         <Router>
           <ScrollToTop />
+          <ReferralTracker />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/ai-receptionist" element={<AIReceptionist />} />
