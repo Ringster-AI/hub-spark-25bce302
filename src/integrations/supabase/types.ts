@@ -3070,6 +3070,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      admin_add_commission_adjustment: {
+        Args: {
+          p_amount_cents: number
+          p_attribution: string
+          p_reason: string
+        }
+        Returns: string
+      }
+      admin_build_payouts: { Args: { p_period: string }; Returns: number }
       admin_create_manual_attribution: {
         Args: {
           p_account_email: string
@@ -3109,6 +3118,10 @@ export type Database = {
           p_partner_id: string
           p_reason?: string
         }
+        Returns: undefined
+      }
+      admin_set_payout_status: {
+        Args: { p_payout: string; p_reference: string; p_status: string }
         Returns: undefined
       }
       admin_set_prospect_protection: {
@@ -3198,6 +3211,39 @@ export type Database = {
       migrate_google_integrations: { Args: never; Returns: undefined }
       my_partner_access: { Args: never; Returns: Json }
       partner_account_owner: { Args: { p_user: string }; Returns: string }
+      partner_active_attribution: {
+        Args: { p_account: string; p_at: string }
+        Returns: {
+          account_id: string
+          agreement_version: string | null
+          approved_at: string | null
+          approved_by: string | null
+          commission_type: string
+          conversion_kind: string
+          created_at: string
+          eligibility_ends_at: string | null
+          eligibility_starts_at: string | null
+          holding_annual_days: number
+          holding_monthly_days: number
+          id: string
+          match_evidence: Json
+          method: string
+          months_snapshot: number
+          partner_id: string
+          prospect_id: string | null
+          rate_snapshot: number
+          rate_version_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "partner_attributions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      partner_earn_due: { Args: never; Returns: number }
       partner_insert_attribution: {
         Args: {
           p_account: string
@@ -3250,6 +3296,32 @@ export type Database = {
       pn_email: { Args: { v: string }; Returns: string }
       pn_phone: { Args: { v: string }; Returns: string }
       process_campaign_contacts: { Args: never; Returns: undefined }
+      record_partner_commission_line: {
+        Args: {
+          p_account: string
+          p_currency: string
+          p_event: string
+          p_excluded: number
+          p_gross: number
+          p_interval: string
+          p_invoice: string
+          p_line: string
+          p_occurred: string
+        }
+        Returns: string
+      }
+      record_partner_commission_reversal: {
+        Args: {
+          p_event: string
+          p_invoice: string
+          p_ledger_key: string
+          p_object: string
+          p_occurred: string
+          p_ratio: number
+          p_source: string
+        }
+        Returns: string
+      }
       record_referral_touch: {
         Args: {
           p_code: string

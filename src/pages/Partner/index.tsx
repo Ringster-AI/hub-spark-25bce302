@@ -43,7 +43,7 @@ export default function PartnerDashboard() {
     queryFn: async () => {
       const [prospects, commissions, rates, me] = await Promise.all([
         db.from("partner_prospects").select("status"),
-        db.from("partner_commissions").select("status, amount_cents"),
+        db.from("partner_commissions").select("id, status, amount_cents, currency, source_type, occurred_at, earn_after").order("occurred_at", { ascending: false }),
         db.from("partner_rate_versions").select("commission_type, rate, months, effective_from").order("effective_from", { ascending: false }),
         db.from("partners").select("payout_method, country").eq("id", access!.partner_id).maybeSingle(),
       ]);
@@ -57,7 +57,7 @@ export default function PartnerDashboard() {
       });
       const latest: Record<string, any> = {};
       (rates.data ?? []).forEach((r: any) => (latest[r.commission_type] ??= r));
-      return { byStatus, totals, rates: latest, payout: me.data };
+      return { byStatus, totals, rates: latest, payout: me.data, history: (commissions.data ?? []).slice(0, 50) };
     },
   });
 
@@ -173,6 +173,19 @@ export default function PartnerDashboard() {
           </CardContent>
         </Card>
         <PartnerProspects />
+        <Card>
+          <CardHeader><CardTitle className="text-base">Commission history</CardTitle></CardHeader>
+          <CardContent>
+            {(summary?.history ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No commission yet. It appears when a customer you referred pays.</p> : (
+              <div className="space-y-1 text-sm">
+                {summary!.history.map((c: any) => (
+                  <div key={c.id} className="flex justify-between border-b py-1">
+                    <span>{new Date(c.occurred_at).toLocaleDateString()} · {({ invoice_line: "Payment", credit_note_line: "Credit", refund: "Refund", dispute: "Chargeback", rate_adjustment: "Adjustment", manual: "Adjustment" } as Record<string, string>)[c.source_type]}</span>
+                    <span>{c.currency.toUpperCase()} {(c.amount_cents / 100).toFixed(2)} <Badge variant="outline" className="ml-2">{c.status === "pending" ? `holding until ${new Date(c.earn_after).toLocaleDateString()}` : c.status}</Badge></span>
+                  </div>))}
+              </div>)}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -67,7 +67,7 @@ export default function AdminPartnerAttributions({ partners }: { partners: { id:
               <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Partner</TableHead><TableHead>How</TableHead><TableHead>Type / rate</TableHead><TableHead>Eligible until</TableHead><TableHead>Status</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>{rows.map((r: any) => (
                 <TableRow key={r.id}>
-                  <TableCell>{r.account?.full_name ?? r.account?.email ?? r.account_id.slice(0, 8)}<div className="text-xs text-muted-foreground">{r.conversion_kind === "existing_free_account" ? "Existing account" : "New signup"}</div></TableCell>
+                  <TableCell>{r.account?.full_name ?? r.account?.email ?? r.account_id.slice(0, 8)}<div className="text-xs text-muted-foreground">{r.conversion_kind === "existing_free_account" ? "Existing account" : "New signup"}</div><button className="text-xs text-muted-foreground underline" onClick={() => { navigator.clipboard.writeText(r.id); toast.success("Credit ID copied"); }}>Copy ID</button></TableCell>
                   <TableCell>{name(r.partner_id)}</TableCell>
                   <TableCell>{METHOD[r.method]}</TableCell>
                   <TableCell>
