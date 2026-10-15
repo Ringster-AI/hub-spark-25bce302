@@ -35,9 +35,13 @@ Deno.serve(async (req) => {
     const link = `${APP_URL}/login?next=${encodeURIComponent("/partner")}`;
     const name = p.display_name ? esc(p.display_name) : "there";
 
-    const r = await fetch("https://api.resend.com/emails", {
+    const r = await fetch("https://connector-gateway.lovable.dev/resend/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+        "X-Connection-Api-Key": RESEND_API_KEY,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         from: "Ringster <noreply@ringster.ai>",
         to: [email],
