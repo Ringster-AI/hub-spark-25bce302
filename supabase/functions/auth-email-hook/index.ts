@@ -1,7 +1,5 @@
 import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
-import { parseEmailWebhookPayload } from 'npm:@lovable.dev/email-js'
-import { WebhookError, verifyWebhookRequest } from 'npm:@lovable.dev/webhooks-js'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { SignupEmail } from '../_shared/email-templates/signup.tsx'
 import { InviteEmail } from '../_shared/email-templates/invite.tsx'
@@ -257,7 +255,7 @@ async function handleWebhook(req: Request): Promise<Response> {
     },
     body: JSON.stringify({
       from: `${SITE_NAME} <noreply@${FROM_DOMAIN}>`,
-      to: [payload.data.email],
+      to: [recipient],
       subject: EMAIL_SUBJECTS[emailType] || 'Notification',
       html,
       text,
@@ -270,7 +268,7 @@ async function handleWebhook(req: Request): Promise<Response> {
     await supabase.from('email_send_log').insert({
       message_id: messageId,
       template_name: emailType,
-      recipient_email: payload.data.email,
+      recipient_email: recipient,
       status: 'failed',
       error_message: `Resend ${resendRes.status}: ${errorBody.slice(0, 500)}`,
     })
@@ -283,11 +281,11 @@ async function handleWebhook(req: Request): Promise<Response> {
   await supabase.from('email_send_log').insert({
     message_id: messageId,
     template_name: emailType,
-    recipient_email: payload.data.email,
+    recipient_email: recipient,
     status: 'sent',
   })
 
-  console.log('Auth email sent', { emailType, email: payload.data.email, run_id })
+  console.log('Auth email sent', { emailType, email: recipient, run_id })
 
   return new Response(
     JSON.stringify({ success: true, sent: true }),
