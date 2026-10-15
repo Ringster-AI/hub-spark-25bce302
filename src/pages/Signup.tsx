@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,6 +52,10 @@ type FormValues = {
 
 const Signup = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rawNext = searchParams.get("next");
+  const nextPath =
+    rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : null;
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [code, setCode] = useState("");
@@ -196,8 +200,13 @@ const Signup = () => {
           .catch((e) => console.warn("welcome email enqueue failed", e));
       }
 
-      toast.success("Welcome to Ringster — let's launch your agent.");
-      navigate("/onboarding");
+      if (nextPath) {
+        toast.success("Welcome to Ringster!");
+        navigate(nextPath, { replace: true });
+      } else {
+        toast.success("Welcome to Ringster — let's launch your agent.");
+        navigate("/onboarding");
+      }
     } catch (e: any) {
       console.error("Signup verify error:", e);
       toast.error(e?.message || "Failed to create account. Please try again.");
@@ -284,7 +293,7 @@ const Signup = () => {
                   <button
                     type="button"
                     className="text-indigo-300 hover:underline"
-                    onClick={() => navigate("/login")}
+                    onClick={() => navigate(nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login")}
                   >
                     Sign in
                   </button>
