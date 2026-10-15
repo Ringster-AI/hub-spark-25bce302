@@ -131,6 +131,34 @@ async function handlePreview(req: Request): Promise<Response> {
 }
 
 // Webhook handler - verifies signature and sends email
+// Supabase "Send Email" auth hook: Standard Webhooks signature verification.
+// Enable in Supabase Dashboard → Authentication → Hooks → Send Email (HTTPS),
+// and store the generated whsec_ secret as SEND_EMAIL_HOOK_SECRET.
+async function verifySupabaseHook(req: Request, rawBody: string): Promise<boolean> {
+  const secret = Deno.env.get('SEND_EMAIL_HOOK_SECRET')
+  if (!secret) {
+    console.error('SEND_EMAIL_HOOK_SECRET not configured')
+    return false
+  }
+  const msgId = req.headers.get('webhook-id')
+  const timestamp = req.headers.get('webhook-timestamp')
+  const signatureHeader = req.headers.get('webhook-signature')
+  if (!msgId || !timestamp || !signatureHeader) return false
+
+  // Reject stale timestamps (5 min tolerance)
+  const age = Math.abs(Date.now() / 1000 - Number(timestamp))
+  if (!Number.isFinite(age) || age > 300) return false
+
+  const secretBytes = Uint8Array.from(atob(secret.replace(/^whsec_/, '')), (c) => c.charCodeAt(0))
+  const key = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const signed = new TextEncoder().encode(`${msgId}.${timestamp}.${rawBody}`)
+  const expected = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign('HMAC', key, signed))))
+
+  return signatureHeader
+    .split(' ')
+    .some((entry) => entry.startsWith('v1,') && entry.slice(3) === expected)
+}
+
 async function handleWebhook(req: Request): Promise<Response> {
   const apiKey = Deno.env.get('LOVABLE_API_KEY')
 
@@ -142,72 +170,37 @@ async function handleWebhook(req: Request): Promise<Response> {
     )
   }
 
-  // Verify signature + timestamp, then parse payload.
-  let payload: any
-  let run_id = ''
-  try {
-    const verified = await verifyWebhookRequest({
-      req,
-      secret: apiKey,
-      parser: parseEmailWebhookPayload,
+  const rawBody = await req.text()
+  if (!(await verifySupabaseHook(req, rawBody))) {
+    return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
-    payload = verified.payload
-    run_id = payload.run_id
-  } catch (error) {
-    if (error instanceof WebhookError) {
-      switch (error.code) {
-        case 'invalid_signature':
-        case 'missing_timestamp':
-        case 'invalid_timestamp':
-        case 'stale_timestamp':
-          console.error('Invalid webhook signature', { error: error.message })
-          return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          })
-        case 'invalid_payload':
-        case 'invalid_json':
-          console.error('Invalid webhook payload', { error: error.message })
-          return new Response(
-            JSON.stringify({ error: 'Invalid webhook payload' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-      }
-    }
-
-    console.error('Webhook verification failed', { error })
-    return new Response(
-      JSON.stringify({ error: 'Invalid webhook payload' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
   }
 
-  if (!run_id) {
-    console.error('Webhook payload missing run_id')
-    return new Response(
-      JSON.stringify({ error: 'Invalid webhook payload' }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+  let payload: any
+  try {
+    payload = JSON.parse(rawBody)
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
-  if (payload.version !== '1') {
-    console.error('Unsupported payload version', { version: payload.version, run_id })
-    return new Response(
-      JSON.stringify({ error: `Unsupported payload version: ${payload.version}` }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+  // Supabase send-email hook payload: { user, email_data: { token, email_action_type, ... } }
+  const emailData = payload?.email_data
+  const emailType = emailData?.email_action_type
+  const recipient = payload?.user?.new_email || payload?.user?.email
+  const run_id = req.headers.get('webhook-id') || ''
+  if (!emailData || !emailType || !recipient) {
+    console.error('Invalid webhook payload', { run_id })
+    return new Response(JSON.stringify({ error: 'Invalid webhook payload' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
-
-  // The email action type is in payload.data.action_type (e.g., "signup", "recovery")
-  // payload.type is the hook event type ("auth")
-  const emailType = payload.data.action_type
-  console.log('Received auth event', { emailType, email: payload.data.email, run_id })
+  console.log('Received auth event', { emailType, email: recipient, run_id })
 
   const EmailTemplate = EMAIL_TEMPLATES[emailType]
   if (!EmailTemplate) {
@@ -218,16 +211,16 @@ async function handleWebhook(req: Request): Promise<Response> {
     )
   }
 
-  // Build template props from payload.data (HookData structure)
+  // Build template props from the Supabase hook payload
   const templateProps = {
     siteName: SITE_NAME,
     siteUrl: `https://${ROOT_DOMAIN}`,
-    recipient: payload.data.email,
-    confirmationUrl: payload.data.url,
-    token: payload.data.token,
-    email: payload.data.email,
-    oldEmail: payload.data.old_email,
-    newEmail: payload.data.new_email,
+    recipient,
+    confirmationUrl: emailData.redirect_to || `https://${ROOT_DOMAIN}`,
+    token: emailData.token,
+    email: recipient,
+    oldEmail: payload.user?.email,
+    newEmail: payload.user?.new_email,
   }
 
   // Render React Email to HTML and plain text
