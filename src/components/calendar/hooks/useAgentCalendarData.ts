@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabaseConfig } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AgentFormData } from "@/types/agents";
 import { generateToolInstructions, appendToolInstructionsToDescription } from "@/utils/agentDescriptionUtils";
@@ -11,14 +11,13 @@ async function ensureCalendarToolsRegistered(): Promise<void> {
   // Check if tools already exist by calling the registration endpoint
   // It handles idempotency internally
   console.log("Ensuring calendar tools are registered...");
-  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData?.session?.access_token;
 
   if (!token) throw new Error("Not authenticated");
 
   const res = await fetch(
-    `https://${projectId}.supabase.co/functions/v1/register-vapi-calendar-tools`,
+    `${supabaseConfig.url}/functions/v1/register-vapi-calendar-tools`,
     {
       method: "POST",
       headers: {
