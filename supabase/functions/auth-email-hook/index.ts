@@ -19,7 +19,7 @@ const corsHeaders = {
 const EMAIL_SUBJECTS: Record<string, string> = {
   signup: 'Confirm your email',
   invite: "You've been invited",
-  magiclink: 'Your login link',
+  magiclink: 'Your sign-in code',
   recovery: 'Reset your password',
   email_change: 'Confirm your new email',
   reauthentication: 'Your verification code',
@@ -36,10 +36,10 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "ringster-hub-spark"
-const SENDER_DOMAIN = "notify.ringster.ai"
+const SITE_NAME = "Ringster"
+const SENDER_DOMAIN = "ringster.ai"
 const ROOT_DOMAIN = "ringster.ai"
-const FROM_DOMAIN = "notify.ringster.ai" // Domain shown in From address (may be root or sender subdomain)
+const FROM_DOMAIN = "ringster.ai" // Must be a domain verified in Resend
 
 // Sample data for preview mode ONLY (not used in actual email sending).
 // URLs are baked in at scaffold time from the project's real data.
