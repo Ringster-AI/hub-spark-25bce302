@@ -157,7 +157,7 @@ export default function Login() {
                 <button
                   type="button"
                   className="text-indigo-300 hover:underline"
-                  onClick={() => navigate("/signup")}
+                  onClick={() => navigate(nextPath ? `/signup?next=${encodeURIComponent(nextPath)}` : "/signup")}
                 >
                   Sign up
                 </button>
