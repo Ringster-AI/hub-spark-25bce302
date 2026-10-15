@@ -39,6 +39,41 @@ const SENDER_DOMAIN = "ringster.ai"
 const ROOT_DOMAIN = "ringster.ai"
 const FROM_DOMAIN = "ringster.ai" // Must be a domain verified in Resend
 
+const ALLOWED_LINK_HOSTS = ['ringster.ai', 'www.ringster.ai', 'dev.ringster.ai', 'getringster.com', 'www.getringster.com', 'localhost', '127.0.0.1']
+function isAllowedHost(host: string): boolean {
+  return ALLOWED_LINK_HOSTS.includes(host) || host.endsWith('.lovable.app') || host.endsWith('.lovableproject.com')
+}
+
+// Recovery: link straight to the app's /reset-password with token_hash, and the
+// page calls verifyOtp. Verifying in-page (not on GET) also stops email link
+// scanners from burning the one-time token before the user clicks.
+// Other types: use Supabase's /auth/v1/verify endpoint, which redirects back.
+function buildConfirmationUrl(emailData: any, emailType: string): string {
+  const tokenHash: string | undefined = emailData?.token_hash
+  const fallbackBase = `https://${ROOT_DOMAIN}`
+  let redirect: URL
+  try {
+    redirect = new URL(emailData?.redirect_to || emailData?.site_url || fallbackBase)
+    if (!isAllowedHost(redirect.hostname)) redirect = new URL(fallbackBase)
+  } catch {
+    redirect = new URL(fallbackBase)
+  }
+  if (!tokenHash) return redirect.toString()
+
+  if (emailType === 'recovery') {
+    const target = new URL('/reset-password', redirect.origin)
+    target.searchParams.set('token_hash', tokenHash)
+    target.searchParams.set('type', 'recovery')
+    return target.toString()
+  }
+
+  const verify = new URL(`${Deno.env.get('SUPABASE_URL')}/auth/v1/verify`)
+  verify.searchParams.set('token', tokenHash)
+  verify.searchParams.set('type', emailType)
+  verify.searchParams.set('redirect_to', redirect.toString())
+  return verify.toString()
+}
+
 // Sample data for preview mode ONLY (not used in actual email sending).
 // URLs are baked in at scaffold time from the project's real data.
 // The sample email uses a fixed placeholder (RFC 6761 .test TLD) so the Go backend
@@ -209,12 +244,16 @@ async function handleWebhook(req: Request): Promise<Response> {
     )
   }
 
+  // Build the clickable link. redirect_to alone carries no token, so the
+  // link must include token_hash or the app can't verify it.
+  const confirmationUrl = buildConfirmationUrl(emailData, emailType)
+
   // Build template props from the Supabase hook payload
   const templateProps = {
     siteName: SITE_NAME,
     siteUrl: `https://${ROOT_DOMAIN}`,
     recipient,
-    confirmationUrl: emailData.redirect_to || `https://${ROOT_DOMAIN}`,
+    confirmationUrl,
     token: emailData.token,
     email: recipient,
     oldEmail: payload.user?.email,

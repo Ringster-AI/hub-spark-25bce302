@@ -19,20 +19,46 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // The recovery link lands here with a token in the URL hash; Supabase
-    // exchanges it and fires PASSWORD_RECOVERY once the session is ready.
+    let cancelled = false;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+      if (event === "PASSWORD_RECOVERY") setReady(true);
+    });
+
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+
+      // Primary path: email links carry token_hash; verify it here.
+      if (tokenHash && type === "recovery") {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+        if (cancelled) return;
+        // Strip the one-time token from the address bar either way.
+        window.history.replaceState({}, "", "/reset-password");
+        if (error) {
+          // A reload after success re-submits a used token; a live session is still fine.
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) setReady(true);
+          else setInvalidLink(true);
+          return;
+        }
         setReady(true);
+        return;
       }
-    });
-    // If the user already holds a recovery session (e.g. page reload), allow the form too.
-    supabase.auth.getSession().then(({ data: { session } }) => {
+
+      // Legacy path: hash tokens (#access_token=...&type=recovery) or an existing session.
+      const hashError = new URLSearchParams(window.location.hash.slice(1)).get("error_description");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
       if (session) setReady(true);
-      else if (window.location.hash.includes("type=recovery")) setReady(true);
+      else if (!hashError && window.location.hash.includes("type=recovery")) setReady(true);
       else setInvalidLink(true);
-    });
-    return () => subscription.unsubscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
