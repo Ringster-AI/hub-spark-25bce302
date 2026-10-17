@@ -24,6 +24,8 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+      // Project deliberately uses non-strict TS (tsconfig strict: false); `any` is pervasive by design.
+      "@typescript-eslint/no-explicit-any": "off",
     },
   }
 );
