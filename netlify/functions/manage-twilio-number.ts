@@ -85,7 +85,7 @@ export const handler: Handler = async (event) => {
 
     // Only create Vapi assistant for inbound agents
     if (agentType === 'inbound') {
-      try {
+      {
         const vapiResponse = await fetch(`${event.rawUrl.split('/.netlify')[0]}/.netlify/functions/manage-vapi-assistant`, {
           method: 'POST',
           headers: {
@@ -109,9 +109,6 @@ export const handler: Handler = async (event) => {
           }
           throw new Error(`Failed to update Vapi assistant: ${vapiError}`)
         }
-      } catch (error) {
-        // Re-throw the error to be caught by the outer catch block
-        throw error
       }
     }
 

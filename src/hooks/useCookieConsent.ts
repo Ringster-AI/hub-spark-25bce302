@@ -66,7 +66,7 @@ export const useCookieConsent = () => {
     if (preferences.analytics) {
       loadAnalyticsScripts();
     } else if ((window as any).__posthog_initialized) {
-      try { posthog.opt_out_capturing(); } catch {}
+      try { posthog.opt_out_capturing(); } catch { /* posthog not ready — ignore */ }
     }
 
     // Marketing scripts (Meta Pixel)

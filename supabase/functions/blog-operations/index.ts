@@ -64,7 +64,7 @@ serve(async (req) => {
           status: 403,
         }
       );
-
+    }
 
     // Parse the request body
     const { operation, postData, postId } = await req.json();
