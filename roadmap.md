@@ -8,5 +8,5 @@
 - [x] Stage 6 Dashboards & reporting (partner_report + partner_report_monthly, admin Reporting panel, partner performance card) — pilot with one real partner still open
 
 ## Pull-request checks
-- [ ] Add full app typechecking and lint, edge-function tests, production dependency auditing, and secret-leak scanning without deployment secrets.
-- [ ] Verify the workflow and available tests; report any existing failures without unrelated fixes.
+- [x] Add full app typechecking and lint, edge-function tests, production dependency auditing, and secret-leak scanning without deployment secrets.
+- [x] Validate workflow syntax and run available checks: 108 Vitest + 6 Deno tests pass; lint reports 513 existing errors; npm audits report 19 high and 3 critical findings across the two lockfiles (may overlap). Secret scanner smoke-tested on a clean fixture. Full typechecks and commit-range scanning await GitHub execution; unrelated fixes excluded.
