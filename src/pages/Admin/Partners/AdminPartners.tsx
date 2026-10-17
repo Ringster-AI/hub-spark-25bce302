@@ -95,7 +95,11 @@ export default function AdminPartners() {
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" onClick={async () => {
                       const { error } = await supabase.functions.invoke("send-partner-invite", { body: { partner_id: p.id } });
-                      error ? toast.error("Invite email failed to send.") : toast.success(`Invite email sent to ${p.invite_email}`);
+                      if (error) {
+                        toast.error("Invite email failed to send.");
+                      } else {
+                        toast.success(`Invite email sent to ${p.invite_email}`);
+                      }
                     }}>Resend email</Button>
                     {p.status !== "suspended"
                       ? <Button size="sm" variant="ghost" onClick={() => setStatus(p.id, "suspended")}>Suspend</Button>

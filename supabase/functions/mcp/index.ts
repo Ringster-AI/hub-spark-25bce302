@@ -15,7 +15,7 @@ function supabaseForUser(ctx) {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
-var list_agents_default = defineTool({
+const list_agents_default = defineTool({
   name: "list_agents",
   title: "List agents",
   description: "List the signed-in user's Ringster AI voice agents with name, status, phone number, and usage.",
@@ -46,7 +46,7 @@ function supabaseForUser2(ctx) {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
-var get_agent_default = defineTool2({
+const get_agent_default = defineTool2({
   name: "get_agent",
   title: "Get agent details",
   description: "Get the full configuration for one of the signed-in user's Ringster agents by id, including greeting, voice, and transfer directory.",
@@ -78,7 +78,7 @@ function supabaseForUser3(ctx) {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
-var list_call_logs_default = defineTool3({
+const list_call_logs_default = defineTool3({
   name: "list_call_logs",
   title: "List call logs",
   description: "List recent call logs for the signed-in user's Ringster agents, optionally filtered by agent_id.",

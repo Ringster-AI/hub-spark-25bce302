@@ -85,7 +85,7 @@ export const handler: Handler = async (event) => {
 
     // Only create Vapi assistant for inbound agents
     if (agentType === 'inbound') {
-      try {
+      {
         const vapiResponse = await fetch(`${event.rawUrl.split('/.netlify')[0]}/.netlify/functions/manage-vapi-assistant`, {
           method: 'POST',
           headers: {
