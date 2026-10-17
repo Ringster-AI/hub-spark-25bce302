@@ -109,9 +109,6 @@ export const handler: Handler = async (event) => {
           }
           throw new Error(`Failed to update Vapi assistant: ${vapiError}`)
         }
-      } catch (error) {
-        // Re-throw the error to be caught by the outer catch block
-        throw error
       }
     }
 
