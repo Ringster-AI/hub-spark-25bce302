@@ -21,10 +21,6 @@ jobs:
       - run: npm ci --legacy-peer-deps --no-audit --no-fund
       - name: Unit and demo database tests
         run: npm test
-      - name: Lint demo foundation
-        run: npx --no-install eslint netlify/functions/services/demo netlify/functions/demo-session.ts netlify/functions/demo-webhook.ts src/features/demo src/pages/Demo.tsx tests/demo vitest.config.ts
-      - name: Typecheck demo foundation
-        run: npx --no-install tsc -p tsconfig.demo.json
       - name: Production build (no production configuration)
         shell: bash
         run: |
@@ -33,3 +29,79 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://example.invalid
           VITE_SUPABASE_ANON_KEY: build-only-placeholder
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Typecheck full app
+        run: npx --no-install tsc -p tsconfig.app.json --noEmit
+      - name: Typecheck build configuration
+        if: ${{ !cancelled() }}
+        run: npx --no-install tsc -p tsconfig.node.json --noEmit
+      - name: Typecheck demo foundation
+        if: ${{ !cancelled() }}
+        run: npx --no-install tsc -p tsconfig.demo.json
+      - name: Lint full project
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
+  edge-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Edge function unit tests (no runtime permissions)
+        run: deno test supabase/functions/
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit app production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit Netlify production dependencies
+        if: ${{ !cancelled() }}
+        working-directory: netlify/functions
+        run: npm audit --omit=dev --audit-level=high
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan changed commits for secrets (redacted)
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+        run: |
+          if [[ -n "$PR_BASE" && -n "$PR_HEAD" ]]; then
+            range="$PR_BASE..$PR_HEAD"
+          elif [[ -n "$PUSH_BEFORE" && ! "$PUSH_BEFORE" =~ ^0+$ ]]; then
+            range="$PUSH_BEFORE..$PUSH_HEAD"
+          else
+            range="$PUSH_HEAD"
+          fi
+          docker run --rm --network none \
+            -v "$GITHUB_WORKSPACE:/repo:ro" \
+            zricethezav/gitleaks:v8.24.3 \
+            git /repo --redact --log-opts="$range"
