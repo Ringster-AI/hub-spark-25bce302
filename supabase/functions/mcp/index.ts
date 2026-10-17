@@ -104,8 +104,8 @@ const list_call_logs_default = defineTool3({
 });
 
 // src/lib/mcp/index.ts
-var projectRef = "owzerqaududhfwngyqbp";
-var mcp_default = defineMcp({
+const projectRef = "owzerqaududhfwngyqbp";
+const mcp_default = defineMcp({
   name: "ringster-mcp",
   title: "Ringster",
   version: "0.1.0",
