@@ -26,3 +26,24 @@ dist-ssr
 # Local Netlify folder
 .netlify
 .aider*
+
+# Environment files -- these hold real credentials and must never be committed.
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+# Backups and copies of the real env file.
+.env.*.bak
+.env.backup
+.env.copy
+# The documented template is safe to commit.
+!.env.example
+!.env.sample
+
+# Migration backups (contain previous API keys)
+.env.pre-vps-migration.bak
